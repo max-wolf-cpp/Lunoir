@@ -906,9 +906,95 @@ function goHome(): void {
   broadcast('ui:home')
 }
 
+/**
+ * Emby / Jellyfin hand out a playback URL that says nothing about what it is —
+ * `…/emby/videos/256818/original.mkv?…&api_key=…` — and bridges like embyToLocalPlayer
+ * launch us with exactly that and no title argument, so the whole UI ends up showing the
+ * raw URL. But the URL carries what we need to ask: the item id and a key. So ask.
+ */
+function embyItemFromUrl(url: string): { base: string; id: string; key: string } | null {
+  try {
+    const u = new URL(url)
+    // path is `/emby/videos/<id>/…` (Emby) or `/Videos/<id>/…` (Jellyfin)
+    const m = u.pathname.match(/^(.*?)\/videos\/([^/]+)\//i)
+    if (!m) return null
+    const key =
+      u.searchParams.get('api_key') ||
+      u.searchParams.get('ApiKey') ||
+      u.searchParams.get('X-Emby-Token')
+    if (!key) return null
+    return { base: `${u.origin}${m[1]}`, id: m[2], key }
+  } catch {
+    return null // not a URL we can read
+  }
+}
+
+/**
+ * What to file a resume position under. Normally the path itself, but an Emby/Jellyfin
+ * URL carries a `PlaySessionId` the server mints fresh for every play — so the raw URL is
+ * a different key each time: the position was written, never found again, and each play
+ * left another orphan behind. The item id is the part that actually identifies the video.
+ */
+function positionKey(path: string): string {
+  const ref = embyItemFromUrl(path)
+  return ref ? `emby:${new URL(ref.base).host}/${ref.id}` : path
+}
+
+type EmbyItem = {
+  Name?: string
+  Type?: string
+  SeriesName?: string
+  ParentIndexNumber?: number
+  IndexNumber?: number
+  ProductionYear?: number
+}
+
+/** "Series · S01E01 · Episode" for TV, "Film (2024)" for everything else. */
+function embyTitle(it: EmbyItem): string {
+  const name = (it.Name || '').trim()
+  if (it.Type === 'Episode' && it.SeriesName) {
+    const pad = (n: number): string => String(n).padStart(2, '0')
+    const code =
+      it.ParentIndexNumber != null && it.IndexNumber != null
+        ? ` · S${pad(it.ParentIndexNumber)}E${pad(it.IndexNumber)}`
+        : ''
+    return `${it.SeriesName}${code}${name ? ` · ${name}` : ''}`
+  }
+  return it.ProductionYear ? `${name} (${it.ProductionYear})` : name
+}
+
+/**
+ * Look the title up and thread it through everywhere a title shows. Entirely best-effort:
+ * a server that's gone, a key that's been revoked or a shape we don't recognise all just
+ * leave the URL on screen, exactly as before — never an error the user has to dismiss.
+ */
+async function resolveEmbyTitle(target: string): Promise<void> {
+  const ref = embyItemFromUrl(target)
+  if (!ref) return
+  try {
+    const res = await fetch(
+      `${ref.base}/Items?Ids=${encodeURIComponent(ref.id)}&api_key=${encodeURIComponent(ref.key)}`,
+      { headers: { 'User-Agent': 'lunoir' }, signal: AbortSignal.timeout(6000) }
+    )
+    if (!res.ok) return
+    const data = (await res.json()) as { Items?: EmbyItem[] }
+    const title = data.Items?.[0] ? embyTitle(data.Items[0]) : ''
+    if (!title || urlTitles[target] === title) return
+    urlTitles[target] = title
+    broadcast('playlist:changed', playlistPayload())
+    updateRecentName(target, title) // the 最近 entry was saved as the raw URL
+    // force it on mpv only if this is still what's playing — the lookup is async and the
+    // user may have moved on. Safe after load, which is the order force-media-title needs.
+    if (playlist[plIndex] === target) mpv?.setProperty('force-media-title', title)
+  } catch {
+    /* offline, timed out, not an Emby server — keep the URL */
+  }
+}
+
 function openMedia(target: string, userAgent = ''): void {
   sourceUa = userAgent // a fresh open replaces it — including clearing it back to none
   recordOpen(target)
+  void resolveEmbyTitle(target) // async; applies itself if it finds a name
   if (isPlaylistUrl(target)) {
     loadPlaylistUrl(target) // async: enumerate the entries, then queue + play them
     return
@@ -2860,7 +2946,7 @@ function startMpv(): void {
     if (name === 'path' && typeof data === 'string') {
       lastProbe = {}
       broadcast('video:hdr', '') // clear until MediaInfo re-resolves (gamma fallback covers HDR meanwhile)
-      resumePath = data // track this file's position for resume
+      resumePath = positionKey(data) // track this file's position for resume
       resumePos = 0
       lastDuration = 0
       stopRecording(true) // a new file means the old recording is done — end it quietly
@@ -3015,7 +3101,7 @@ function startMpv(): void {
     applyScreenshotDir()
     mpv!.setProperty('screenshot-template', '%F_%wH-%wM-%wS')
     applyScreenshotFormat()
-    const launchFile = fileFromArgv(process.argv)
+    const launchFile = targetFromArgv(process.argv)
     if (launchFile) {
       setTimeout(() => openMedia(launchFile), 300)
     } else if (process.env['MMP_OPEN']) {
@@ -3478,16 +3564,22 @@ function buildMenu(): void {
 }
 
 /**
- * The path Windows hands us when a file is opened with this app.
+ * What we were asked to play, from the command line.
  *
- * Double-clicking a video, "Open with", or dropping a file on the exe all boil
- * down to the same thing: the shell runs `Lunoir.exe "D:\clip.mkv"`, passing the
- * path as a plain argument. Skip switches and the app's own path (in dev, argv[1]
- * is "."), and only accept something that actually exists.
+ * Double-clicking a video, "Open with", or dropping a file on the exe all boil down to
+ * the same thing: the shell runs `Lunoir.exe "D:\clip.mkv"`, passing the path as a plain
+ * argument. Skip switches and the app's own path (in dev, argv[1] is "."), and only
+ * accept a file that actually exists.
+ *
+ * A URL is also accepted, because that is how the outside world hands us a stream:
+ * emby/jellyfin bridges like embyToLocalPlayer launch the configured player with a bare
+ * playback URL and nothing else. Requiring the argument to exist on disk quietly rejected
+ * those — the window opened and then just sat there on the home screen.
  */
-function fileFromArgv(argv: string[]): string | null {
+function targetFromArgv(argv: string[]): string | null {
   for (const raw of argv.slice(1)) {
     if (!raw || raw.startsWith('-')) continue
+    if (isUrl(raw)) return raw
     try {
       const p = resolve(raw)
       if (p === resolve(app.getAppPath()) || p === resolve(process.execPath)) continue
@@ -3514,7 +3606,7 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.on('second-instance', (_e, argv) => {
-    const file = fileFromArgv(argv)
+    const file = targetFromArgv(argv)
     if (file) openMedia(file)
     focusMainWindow()
   })
