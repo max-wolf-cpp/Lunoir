@@ -2,7 +2,56 @@
 
 > 每到相对重要的节点更新此文档。方案见 [PLAN.md](PLAN.md)。
 
-## 当前状态（2026-07-24 · v0.8.0 发布 · 画质增强 + 设置分页 + 两个顽固 bug）
+## 当前状态（2026-07-26 · v0.8.1 发布 · 接进 Emby:能播 + 认得出片名 + 续播真的续得上）
+
+**阶段：把 Lunoir 接进已有的媒体库工作流 —— Emby 网页点播放直接在 Lunoir 里开。一个功能带两个坑,三件事都是「先量后改」量出来的。类型 / 构建全绿(本轮无 i18n 改动)。**
+
+桥接工具 [embyToLocalPlayer](https://github.com/kjtsune/embyToLocalPlayer) 负责把 Emby 的播放动作转给本地播放器。它在 `embyToLocalPlayer_config.ini` 里指到 Lunoir 后:**窗口能弹出来,但不起播。**
+
+### ① 命令行不认 URL（这才是不起播的原因）
+从进程表里把真实命令行读出来 —— `Get-CimInstance Win32_Process`,一眼看到:
+
+```
+Lunoir.exe http://192.168.50.91:8088/emby/videos/256818/original.mkv?…&api_key=…&Static=true
+```
+
+**一个裸的 http 地址,没有任何其它参数。** 而 `fileFromArgv()` 最后一关是 `existsSync(p)` —— URL `resolve()` 之后成了 `D:\…\http:\…`,自然不存在 → 返回 null → 窗口开了、片子没进来。放行 URL 即可(`isUrl(raw)` 提到 `existsSync` 前面),顺手更名 `targetFromArgv`(返回的已不只是"文件")。**两个入口都要改**:启动 argv,以及单实例的 `second-instance`(Lunoir 已经开着时再点播放走的是后者)。
+
+讽刺的是 URL 播放**本来就支持**(拖网址进来就能放,同一个 `openMedia()`),只是命令行这条路没放行。
+
+### ② 标题是一长串 query string —— 那就自己去问
+`--force-media-title` 是 embyToLocalPlayer 喂给**适配过的**六个播放器(mpv / PotPlayer / MPC / VLC / IINA / 弹弹play)的,Lunoir 不在名单里,一个参数都拿不到 —— 所以 MPC 那边同样没标题。
+
+但**URL 自己带着答案**:`…/videos/**256818**/…?…&**api_key=…**`,条目 ID 和钥匙都在。一个 GET:
+
+```
+{server}/emby/Items?Ids={id}&api_key={key}
+→ SeriesName / ParentIndexNumber / IndexNumber / Name / ProductionYear
+```
+
+拼成 `剧名 · S01E01 · 集名`(剧集)或 `片名 (年份)`(其它),铺到标题栏 / OSC / 播放列表 /「最近」(`updateRecentName()` 本来就是给"URL 拿到真名后再修正"用的)。**不引入新依赖**(全局 `fetch`,和检查更新同一套)。Jellyfin 路径形状一样(`/Videos/<id>/`),顺带支持。
+
+**全程 best-effort**:服务器不通 / key 失效 / 认不出的返回 → 6 秒超时后**静默保持原状**,绝不弹错误。发包前用真实 URL 离线验过三条用例:真地址出真名、YouTube 不误伤、缺 api_key 不动作。
+
+**沿用旧坑的教训**:`force-media-title` 必须在 `loadFile` **之后**设(IPTV 那轮踩过),而且反查是异步的 —— 落地时要先确认 `playlist[plIndex]` 还是当初那个目标,否则会把标题盖到用户已经切走的片子上。
+
+### ③ 续播"记了等于没记"
+`positions.json` 里翻出实据:那一集**只有一条**记录,键是整条 URL、里面嵌着 `PlaySessionId=e4ce6e8a…`。而 **Emby 每次播放都新发一个 PlaySessionId** —— 键次次不同 → 上次存的永远找不回来,而且每播一次多攒一条孤儿记录。
+
+改成用**条目 ID** 当键(`emby:host/256818`)。落点只有一处:`resumePath = positionKey(data)`,存/读/清三处自动跟着走。
+
+### 下一轮：Emby 双向进度同步（有意留到单独一轮）
+真正的正解是**回传进度** —— Emby 成为唯一事实来源:手机看到 20 分钟换电脑接着看、看完自动标已观看。料都在手上了(api_key / item id / PlaySessionId,后者正是回传接口要用的)。接口是 `/Sessions/Playing` → `/Playing/Progress` → `/Playing/Stopped`,续播点读 `UserData.PlaybackPositionTicks`。
+
+**为什么不塞进这一版**:读和写必须一起上。只读不回传的话,Emby 那边的进度永远不动 → **每次都从同一个陈旧的点开始**,比现在更让人困惑。③ 那个本地键将来也留着 —— 断网或回传失败时的兜底。
+
+### 发布 v0.8.1
+- `package.json` 0.8.0 → 0.8.1;两个 exe(setup 108.3MB / portable 108.0MB,未签名)+ tag `v0.8.1`。
+- **本轮方法论**:三件事全是**先量后改** —— 进程表读真实命令行、拿真 URL 打 Emby API 验通、翻 `positions.json` 看键长什么样。只凭"Emby 应该会传个地址出来"这个方向,很容易改到别处去。
+
+---
+
+## 历史状态（2026-07-24 · v0.8.0 发布 · 画质增强 + 设置分页 + 两个顽固 bug）
 
 **阶段：给烂片源(直播/IPTV)做一整套画质增强,全部 opt-in;顺手把设置拆成四页。外加两个 bug —— 音量到不了自己的上限、全屏光标不肯隐藏,后者挖到了 Chromium 的底层行为。类型 / i18n(9 语言 275) / 构建全绿。**
 
