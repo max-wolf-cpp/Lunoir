@@ -51,7 +51,8 @@ export interface PlayerState {
   hasMedia: boolean
   gamma: string // video transfer fn ('pq'/'hlg'/…) → generic HDR fallback
   hdrFormat: string // MediaInfo HDR flavour: 'Dolby Vision'/'HDR10+'/'HDR10'/'' → refines the badge
-  videoHeight: number // decoded height → resolution badge
+  videoWidth: number // decoded size → resolution badge (both dims: see resTier in Controls)
+  videoHeight: number
   isStream: boolean // playing a network URL (show the resolution badge only then)
   // Live → OSC shows ● LIVE and no seek bar. Two ways to be live: mpv says the stream
   // isn't seekable, OR we're playing from a channel list (see isChannel).
@@ -102,6 +103,7 @@ const initial: PlayerState = {
   hasMedia: false,
   gamma: '',
   hdrFormat: '',
+  videoWidth: 0,
   videoHeight: 0,
   isStream: false,
   isLive: false,
@@ -228,6 +230,8 @@ export function usePlayer() {
             return { ...s, isLive: s.isChannel || (s.isStream && data === false) }
           case 'video-params/gamma':
             return { ...s, gamma: typeof data === 'string' ? data : '' }
+          case 'video-params/w':
+            return { ...s, videoWidth: typeof data === 'number' ? data : s.videoWidth }
           case 'video-params/h':
             return { ...s, videoHeight: typeof data === 'number' ? data : s.videoHeight }
           case 'audio-codec-name':

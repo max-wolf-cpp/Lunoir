@@ -97,6 +97,28 @@ interface Props {
   onCycleTimeFormat: () => void
 }
 
+/**
+ * The resolution tier a viewer would name, from the decoded frame.
+ *
+ * Height alone is wrong for anything wider than 16:9: scope films are stored without the
+ * black bars, so a 1080p 2.40:1 film is 1920x800 and this badge used to call it "800p"
+ * (and a 4K one 1608p). Take whichever dimension implies the higher tier — height for
+ * 4:3 and taller, width-as-16:9 for scope — then snap to the nearest standard tier so a
+ * slightly cropped encode doesn't read "1076p".
+ */
+export function resTier(w: number, h: number): number {
+  const tier = Math.max(h, w > 0 ? Math.round((w * 9) / 16) : 0)
+  const STD = [4320, 2160, 1440, 1080, 720, 576, 540, 480, 360, 240]
+  // nearest, not first-within-tolerance: 544 sits inside 576's 6% but is plainly 540p
+  let best = 0
+  for (const s of STD) {
+    if (Math.abs(tier - s) <= s * 0.06 && (!best || Math.abs(tier - s) < Math.abs(tier - best))) {
+      best = s
+    }
+  }
+  return best || tier
+}
+
 export default function Controls(props: Props) {
   const t = useT()
   const { state } = props
@@ -116,7 +138,7 @@ export default function Controls(props: Props) {
   // a channel just gets the number.
   const res =
     state.isStream && state.videoHeight > 0
-      ? `${state.videoHeight}${state.isChannel ? '' : 'p'}`
+      ? `${resTier(state.videoWidth, state.videoHeight)}${state.isChannel ? '' : 'p'}`
       : ''
   const topBadge = [res, hdr].filter(Boolean).join(' ')
 

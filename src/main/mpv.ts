@@ -41,7 +41,10 @@ const OBSERVED = [
   // the number jumps by 2 or sticks. Let mpv count.
   'estimated-frame-number',
   'video-params/gamma', // transfer fn: 'pq'/'hlg' → HDR badge
-  'video-params/h', // decoded height → resolution badge (useful for streams)
+  // decoded size → resolution badge (streams only). Both, because height alone misreads
+  // scope: a 2.40:1 film is stored 1920x800, and that is a 1080p film, not an 800p one.
+  'video-params/w',
+  'video-params/h',
   'audio-codec-name', // e.g. 'eac3', 'truehd', 'dts' → audio format badge
   'audio-params/channel-count'
 ] as const
