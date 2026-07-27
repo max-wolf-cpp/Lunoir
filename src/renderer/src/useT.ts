@@ -46,6 +46,13 @@ function subscribe(l: () => void): () => void {
   }
 }
 
+/** The live interface locale, for the odd caller that needs the tag rather than a
+ *  translation — Intl formatters (see langLabel) take one directly. Read it during
+ *  render: useT's subscription is what re-renders the component on a language change. */
+export function currentLocale(): Locale {
+  return locale
+}
+
 export type T = (key: Key, vars?: Record<string, string | number>) => string
 
 /** Translate function bound to the current interface language. Re-renders the

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent as ReactMouseEvent } from 'react'
-import { useT, type T } from '../useT'
+import { useT, currentLocale, type T } from '../useT'
+import { langLabel, langDescriptors } from '../langLabel'
 
 type Tab = 'playlist' | 'chapters' | 'tracks'
 type RepeatMode = 'off' | 'all' | 'one'
@@ -92,20 +93,21 @@ function subFmt(codec?: string): string {
 // Subtitle left label. The format lives in the right-hand tag (subFmt), so strip
 // format tokens out of the title ("English-PGS" → "English") and don't repeat the
 // codec. Keeps meaningful descriptors like SDH / Forced. Falls back to language.
-function subName(t: Track, tr: T): string {
-  let title = t.title && !looksLikeFilename(t.title) ? t.title : ''
-  if (title) {
-    title = title
-      .replace(/[._\-]+/g, ' ') // separators → space
-      .replace(/\b(subrip|srt|sup|pgs|pgssub|vobsub|ass|ssa|webvtt|dvb)\b/gi, ' ') // drop format
-      .replace(/\s+/g, ' ')
-      .trim()
-  }
-  const lang = langName(t.lang)
-  if (!title) return lang || tr('panel.trackN', { n: t.id })
-  // prefix the language only if the title doesn't already name it
-  if (lang && !title.toLowerCase().includes(lang.toLowerCase())) return `${lang} ${title}`
-  return title
+function subName(t: Track, tr: T, loc: string): string {
+  const raw = t.title && !looksLikeFilename(t.title) ? t.title : ''
+  // The title is the more specific source when it names languages: a bilingual sidecar is
+  // tagged `zh-CN` but titled `简英`, and only the title knows English is in there too.
+  const named = langLabel(raw, loc) || langLabel(t.lang, loc)
+  const desc = langDescriptors(raw)
+  if (named) return [named, desc].filter(Boolean).join(' ')
+  // no language in either — keep whatever the title says, minus the format tokens (those
+  // live in the right-hand tag), e.g. "Director's commentary"
+  const title = raw
+    .replace(/[._\-]+/g, ' ')
+    .replace(/\b(subrip|srt|sup|pgs|pgssub|vobsub|ass|ssa|webvtt|dvb)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return title || tr('panel.trackN', { n: t.id })
 }
 
 const AUDIO_FMT: Record<string, string> = {
@@ -120,22 +122,6 @@ const AUDIO_FMT: Record<string, string> = {
   vorbis: 'Vorbis',
   mp3: 'MP3'
 }
-const LANG_NAME: Record<string, string> = {
-  eng: 'English', jpn: 'Japanese', chi: 'Chinese', zho: 'Chinese',
-  fra: 'French', fre: 'French', deu: 'German', ger: 'German',
-  spa: 'Spanish', ita: 'Italian', kor: 'Korean', rus: 'Russian',
-  por: 'Portuguese', dut: 'Dutch', nld: 'Dutch', pol: 'Polish',
-  tha: 'Thai', vie: 'Vietnamese', ara: 'Arabic', hin: 'Hindi',
-  ind: 'Indonesian', tur: 'Turkish', swe: 'Swedish', dan: 'Danish',
-  nor: 'Norwegian', fin: 'Finnish', ces: 'Czech', cze: 'Czech',
-  ell: 'Greek', gre: 'Greek', heb: 'Hebrew', hun: 'Hungarian', ukr: 'Ukrainian'
-}
-
-function langName(lang?: string): string {
-  if (!lang) return ''
-  return LANG_NAME[lang.toLowerCase()] || lang.toUpperCase()
-}
-
 function audioFmt(codec?: string): string {
   if (!codec) return ''
   const c = codec.toLowerCase()
@@ -183,8 +169,8 @@ function audioFormatName(t: Track, ff?: ProbeStream): string {
 // DD 5.1: a 640k main + a 448k track). MediaInfo (ff) supplies the per-track
 // bitrate + commercial format that mpv can't report for inactive tracks; we fall
 // back to mpv's demux-bitrate when it's absent. Keep a descriptive title too.
-function audioTrackLabel(t: Track, ff: ProbeStream | undefined, tr: T): string {
-  let main = [langName(t.lang), audioFormatName(t, ff), chLayout(t['demux-channel-count'])]
+function audioTrackLabel(t: Track, ff: ProbeStream | undefined, tr: T, loc: string): string {
+  let main = [langLabel(t.lang, loc), audioFormatName(t, ff), chLayout(t['demux-channel-count'])]
     .filter(Boolean)
     .join(' ')
   const br = bitrate(ff?.bitRate ?? t['demux-bitrate'])
@@ -365,6 +351,7 @@ const Chevron = () => (
 // The right-hand context panel. Tabs: Playlist, Chapters, Audio & Sub.
 export default function RightPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT()
+  const loc = currentLocale() // track languages are named by ICU, not our own dictionaries
   const [tab, setTab] = useState<Tab>('tracks') // Audio & Sub is the default tab
   const [pl, setPl] = useState<Playlist>({ items: [], index: -1, repeat: 'off', shuffle: false, sourceType: 'queue', merge: false, canMerge: false, trimClip: -1 })
   const [chapters, setChapters] = useState<Chapter[]>([])
@@ -940,7 +927,7 @@ export default function RightPanel({ open, onClose }: { open: boolean; onClose: 
                 >
                   <span className="pl-mark">{tk.id === aid ? <Check /> : null}</span>
                   <span className="pl-name" onMouseEnter={e => clipTitle(e.currentTarget)}>
-                    {audioTrackLabel(tk, tk['ff-index'] != null ? probe[tk['ff-index']] : undefined, t)}
+                    {audioTrackLabel(tk, tk['ff-index'] != null ? probe[tk['ff-index']] : undefined, t, loc)}
                   </span>
                 </div>
               ))
@@ -978,7 +965,7 @@ export default function RightPanel({ open, onClose }: { open: boolean; onClose: 
               >
                 <span className="pl-mark">{tk.id === sid ? <Check /> : null}</span>
                 <span className="pl-name" onMouseEnter={e => clipTitle(e.currentTarget)}>
-                  {subName(tk, t)}
+                  {subName(tk, t, loc)}
                 </span>
                 {subFmt(tk.codec) && <span className="pl-fmt">{subFmt(tk.codec)}</span>}
               </div>
