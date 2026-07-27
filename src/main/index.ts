@@ -912,7 +912,9 @@ function goHome(): void {
  * launch us with exactly that and no title argument, so the whole UI ends up showing the
  * raw URL. But the URL carries what we need to ask: the item id and a key. So ask.
  */
-function embyItemFromUrl(url: string): { base: string; id: string; key: string } | null {
+function embyItemFromUrl(
+  url: string
+): { base: string; id: string; key: string; msid: string } | null {
   try {
     const u = new URL(url)
     // path is `/emby/videos/<id>/…` (Emby) or `/Videos/<id>/…` (Jellyfin)
@@ -923,7 +925,12 @@ function embyItemFromUrl(url: string): { base: string; id: string; key: string }
       u.searchParams.get('ApiKey') ||
       u.searchParams.get('X-Emby-Token')
     if (!key) return null
-    return { base: `${u.origin}${m[1]}`, id: m[2], key }
+    return {
+      base: `${u.origin}${m[1]}`,
+      id: m[2],
+      key,
+      msid: u.searchParams.get('MediaSourceId') || ''
+    }
   } catch {
     return null // not a URL we can read
   }
@@ -940,6 +947,17 @@ function positionKey(path: string): string {
   return ref ? `emby:${new URL(ref.base).host}/${ref.id}` : path
 }
 
+type EmbyStream = {
+  Type?: string
+  Index?: number
+  Codec?: string
+  Language?: string
+  Title?: string
+  DisplayTitle?: string
+  IsExternal?: boolean
+  IsTextSubtitleStream?: boolean
+}
+
 type EmbyItem = {
   Name?: string
   Type?: string
@@ -947,6 +965,72 @@ type EmbyItem = {
   ParentIndexNumber?: number
   IndexNumber?: number
   ProductionYear?: number
+  MediaSources?: { Id?: string; MediaStreams?: EmbyStream[] }[]
+}
+
+type ExternalSub = { url: string; title: string; lang: string }
+
+/**
+ * External subtitles sitting next to the file are invisible over HTTP: mpv's sub-auto
+ * scans the directory the media lives in, and a URL has no directory — so a folder full
+ * of .ass/.srt sidecars simply never showed up. The server did index them though, so take
+ * them from there and hand mpv the stream URL for each.
+ */
+function externalSubs(item: EmbyItem, ref: NonNullable<ReturnType<typeof embyItemFromUrl>>): ExternalSub[] {
+  const src = item.MediaSources?.[0]
+  const msid = ref.msid || src?.Id || ''
+  if (!msid) return []
+  const EXT: Record<string, string> = { ass: 'ass', ssa: 'ssa', subrip: 'srt', srt: 'srt', webvtt: 'vtt', vtt: 'vtt' }
+  return (src?.MediaStreams || [])
+    .filter(s => s.Type === 'Subtitle' && s.IsExternal && s.IsTextSubtitleStream && s.Index != null)
+    .map(s => {
+      const codec = (s.Codec || '').toLowerCase()
+      const ext = EXT[codec] || 'srt' // anything exotic: let the server convert to SRT
+      return {
+        url: `${ref.base}/Videos/${ref.id}/${msid}/Subtitles/${s.Index}/Stream.${ext}?api_key=${encodeURIComponent(ref.key)}`,
+        // Title is the only thing that separates "简英" (bilingual) from the plain one —
+        // DisplayTitle calls both of them "Chinese Simplified (ASS)".
+        title: s.Title ? `${s.Title} (${codec.toUpperCase()})` : s.DisplayTitle || 'Subtitle',
+        lang: s.Language || ''
+      }
+    })
+}
+
+/** Loose language match, so `zh` in the settings finds a `zh-CN` track (and chi/zho too). */
+function langMatches(pref: string, lang: string): boolean {
+  const ALIAS: Record<string, string> = { chi: 'zh', zho: 'zh', jpn: 'ja', kor: 'ko', eng: 'en', fre: 'fr', fra: 'fr', ger: 'de', deu: 'de', spa: 'es', por: 'pt', rus: 'ru' }
+  const key = (s: string): string => {
+    const base = s.trim().toLowerCase().split(/[-_]/)[0]
+    return ALIAS[base] || base
+  }
+  if (!pref || !lang) return false
+  return pref.split(',').some(p => p.trim() && key(p) === key(lang))
+}
+
+// subs resolved for a target that isn't loaded yet — mpv can only take them once the
+// file is open, and the lookup is async, so whichever lands second does the work
+let pendingSubs: { target: string; subs: ExternalSub[] } | null = null
+let loadedTarget = '' // what mpv most recently reported as loaded
+
+function addExternalSubs(subs: ExternalSub[]): void {
+  if (!mpv || !subs.length || !getSettings().autoLoadSubs) return
+  const pref = getSettings().subLang
+  // mpv picks tracks when the file opens, and these arrive after that — so `auto` (add
+  // without selecting) would leave a preference unhonoured. Select the first match
+  // ourselves; with no preference set, nothing is forced, exactly like a local file.
+  let selected = false
+  for (const s of subs) {
+    const pick = !selected && langMatches(pref, s.lang)
+    if (pick) selected = true
+    mpv.command(['sub-add', s.url, pick ? 'select' : 'auto', s.title, s.lang]).catch(() => {})
+  }
+}
+
+function flushPendingSubs(target: string): void {
+  if (!pendingSubs || pendingSubs.target !== target) return
+  const { subs } = pendingSubs
+  pendingSubs = null
+  addExternalSubs(subs)
 }
 
 /** "Series · S01E01 · Episode" for TV, "Film (2024)" for everything else. */
@@ -968,33 +1052,43 @@ function embyTitle(it: EmbyItem): string {
  * a server that's gone, a key that's been revoked or a shape we don't recognise all just
  * leave the URL on screen, exactly as before — never an error the user has to dismiss.
  */
-async function resolveEmbyTitle(target: string): Promise<void> {
+async function resolveEmbyItem(target: string): Promise<void> {
   const ref = embyItemFromUrl(target)
   if (!ref) return
   try {
+    // MediaSources rides along on the same request the title needs — no second round trip
     const res = await fetch(
-      `${ref.base}/Items?Ids=${encodeURIComponent(ref.id)}&api_key=${encodeURIComponent(ref.key)}`,
+      `${ref.base}/Items?Ids=${encodeURIComponent(ref.id)}&Fields=MediaSources&api_key=${encodeURIComponent(ref.key)}`,
       { headers: { 'User-Agent': 'lunoir' }, signal: AbortSignal.timeout(6000) }
     )
     if (!res.ok) return
-    const data = (await res.json()) as { Items?: EmbyItem[] }
-    const title = data.Items?.[0] ? embyTitle(data.Items[0]) : ''
-    if (!title || urlTitles[target] === title) return
-    urlTitles[target] = title
-    broadcast('playlist:changed', playlistPayload())
-    updateRecentName(target, title) // the 最近 entry was saved as the raw URL
-    // force it on mpv only if this is still what's playing — the lookup is async and the
-    // user may have moved on. Safe after load, which is the order force-media-title needs.
-    if (playlist[plIndex] === target) mpv?.setProperty('force-media-title', title)
+    const item = ((await res.json()) as { Items?: EmbyItem[] }).Items?.[0]
+    if (!item) return
+    if (playlist[plIndex] !== target) return // the user moved on while we were asking
+
+    const title = embyTitle(item)
+    if (title && urlTitles[target] !== title) {
+      urlTitles[target] = title
+      broadcast('playlist:changed', playlistPayload())
+      updateRecentName(target, title) // the 最近 entry was saved as the raw URL
+      // safe after load, which is the order force-media-title needs anyway
+      mpv?.setProperty('force-media-title', title)
+    }
+
+    const subs = externalSubs(item, ref)
+    if (!subs.length) return
+    if (loadedTarget === target) addExternalSubs(subs) // already playing → add now
+    else pendingSubs = { target, subs } // still opening → file-loaded will pick these up
   } catch {
-    /* offline, timed out, not an Emby server — keep the URL */
+    /* offline, timed out, not an Emby server — keep the URL, keep the subs it has */
   }
 }
 
 function openMedia(target: string, userAgent = ''): void {
   sourceUa = userAgent // a fresh open replaces it — including clearing it back to none
   recordOpen(target)
-  void resolveEmbyTitle(target) // async; applies itself if it finds a name
+  pendingSubs = null // a new open invalidates anything the last lookup was holding
+  void resolveEmbyItem(target) // async; applies the title + any external subs itself
   if (isPlaylistUrl(target)) {
     loadPlaylistUrl(target) // async: enumerate the entries, then queue + play them
     return
@@ -3072,6 +3166,8 @@ function startMpv(): void {
     // buffers at the right spot); the toast waits for playback-restart above
     if (event === 'file-loaded') {
       pendingResumeToast = '' // clear any stale pending toast from a failed load
+      loadedTarget = playlist[plIndex] || ''
+      flushPendingSubs(loadedTarget) // Emby's sidecar subs, if the lookup beat the load
       if (getSettings().resumePlayback && resumePath && canResume()) {
         const pos = getPosition(resumePath)
         if (typeof pos === 'number' && pos > 5) {
