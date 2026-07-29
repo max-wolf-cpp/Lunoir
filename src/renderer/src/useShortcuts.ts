@@ -13,6 +13,10 @@ interface Handlers {
   bumpVolume: (d: number) => void
   toggleMute: () => void
   fullscreen: () => void
+  // Esc leaves fullscreen. Every window binds it (the panels and the OSC can hold focus
+  // in fullscreen too), and main decides whether there's a fullscreen to leave — a view
+  // would have to track that itself, and four copies of one flag is three too many.
+  escape: () => void
   openFile: () => void
   next: () => void
   prev: () => void
@@ -66,6 +70,9 @@ export function useShortcuts(h: Handlers) {
         case 'F':
           h.fullscreen()
           return // fullscreen toggle shouldn't pop the OSC
+        case 'Escape':
+          h.escape()
+          return // leaving fullscreen shouldn't pop the OSC either
         case 'm':
         case 'M':
           h.toggleMute()

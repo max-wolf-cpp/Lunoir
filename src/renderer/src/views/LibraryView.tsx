@@ -11,6 +11,7 @@ export default function LibraryView() {
 
   // keep global shortcuts working when this window has focus (like PanelView)
   useShortcuts({
+    escape: () => window.mmp.exitFullscreen(),
     togglePause: p.togglePause,
     seekBy: p.seekBy,
     frameStep: p.frameStep,

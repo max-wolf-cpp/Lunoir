@@ -3613,6 +3613,10 @@ function registerIpc(): void {
   })
   ipcMain.on('win:close', () => win?.close())
   ipcMain.on('win:toggle-fullscreen', () => toggleFullscreen())
+  // Esc: leave fullscreen if we're in it, otherwise nothing — never a way to ENTER it
+  ipcMain.on('win:exit-fullscreen', () => {
+    if (preFsBounds) toggleFullscreen()
+  })
   // the renderer dropped .cursor-active (pointer idle) — that can be the change that
   // enables cursor:none, and it happens with no mouse event behind it. See nudgeCursor.
   ipcMain.on('ui:cursor-idle', () => nudgeCursor())

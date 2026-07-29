@@ -14,6 +14,7 @@ export default function PanelView({ kind }: { kind: 'playlist' | 'settings' }) {
 
   // keep keyboard shortcuts working when this window has focus (like OscView)
   useShortcuts({
+    escape: () => window.mmp.exitFullscreen(),
     togglePause: p.togglePause,
     seekBy: p.seekBy,
     frameStep: p.frameStep,

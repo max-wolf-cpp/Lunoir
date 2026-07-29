@@ -28,6 +28,7 @@ export default function OscView() {
   }
 
   useShortcuts({
+    escape: () => window.mmp.exitFullscreen(),
     togglePause: p.togglePause,
     seekBy: p.seekBy,
     frameStep: p.frameStep,
