@@ -216,6 +216,7 @@ export default function OverlayView() {
   }
 
   useShortcuts({
+    escape: () => window.mmp.exitFullscreen(),
     togglePause: p.togglePause,
     seekBy: p.seekBy,
     frameStep: p.frameStep,
@@ -233,6 +234,17 @@ export default function OverlayView() {
 
   // grey title strip only over video; hide it (and the reserved margin) fullscreen
   useEffect(() => window.mmp.onFullscreen(fs => document.body.classList.toggle('fullscreen', fs)), [])
+  // a side panel open → right-click puts it away instead of opening the menu (they're
+  // mutually exclusive, so one flag for "something is open on the side" is enough)
+  const [sidePanelOpen, setSidePanelOpen] = useState<'playlist' | 'settings' | null>(null)
+  useEffect(
+    () => window.mmp.onPanelState(open => setSidePanelOpen(prev => (open ? 'playlist' : prev === 'playlist' ? null : prev))),
+    []
+  )
+  useEffect(
+    () => window.mmp.onSettingsPanelState(open => setSidePanelOpen(prev => (open ? 'settings' : prev === 'settings' ? null : prev))),
+    []
+  )
   // Windows won't give a maximized window the acrylic backdrop, so the empty state
   // paints a solid fallback instead of showing through to black.
   useEffect(
@@ -278,12 +290,14 @@ export default function OverlayView() {
 
   // the menu window hides the OSC, which would drop us into .ui-hidden (cursor:none)
   const [menuOpen, setMenuOpen] = useState(false)
+  const menuClosedAt = useRef(0)
   const [tcOverlay, setTcOverlay] = useState(false)
   const [libraryOpen, setLibraryOpen] = useState(false)
   useEffect(
     () =>
       window.mmp.onMenuState(open => {
         setMenuOpen(open)
+        if (!open) menuClosedAt.current = Date.now()
         // When the menu closes, the pointer sits where the menu was and the closing
         // window emits a synthetic mousemove on us — NOT intent to see the OSC. Treat
         // it as a re-entry: the OSC stays down until the pointer genuinely moves
@@ -295,6 +309,19 @@ export default function OverlayView() {
       }),
     []
   )
+  /**
+   * Is this click the one that put the context menu away? Then it does nothing else —
+   * dismissing a popup consumes the click, the way every menu on Windows behaves. Without
+   * this, clicking to close the menu also paused the video (the menu is its own window and
+   * closes on blur, so the same press reached the video underneath), and right-clicking
+   * elsewhere closed it only to open a second one.
+   *
+   * Both orderings have to be covered: closing is decided in main (the menu window's blur)
+   * and relayed over IPC, while the click is dispatched by this renderer — so when it runs
+   * we may still think the menu is open, or the close may already have landed.
+   */
+  const dismissesMenu = (): boolean => menuOpen || Date.now() - menuClosedAt.current < 250
+
   // the 收藏 overlay hides the OSC (→ .ui-hidden); keep the pointer visible while it's up
   useEffect(() => window.mmp.onLibraryReveal(setLibraryOpen), [])
 
@@ -525,8 +552,8 @@ export default function OverlayView() {
         // In the mini player the picture is the drag handle, so a press moves the window
         // rather than pausing — that's why the play button is large. Double-click is left
         // alone there too; exit is the button, the menu, or Esc.
-        onClick={mini ? undefined : p.togglePause}
-        onDoubleClick={mini ? undefined : p.fullscreen}
+        onClick={mini ? undefined : () => !dismissesMenu() && p.togglePause()}
+        onDoubleClick={mini ? undefined : () => !dismissesMenu() && p.fullscreen()}
         onPointerDown={mini ? onMiniPointerDown : undefined}
         onPointerMove={mini ? onMiniPointerMove : undefined}
         onPointerUp={mini ? onMiniPointerUp : undefined}
@@ -535,6 +562,14 @@ export default function OverlayView() {
           // right-click menu only during playback (empty state keeps its URL shortcut)
           if (!p.state.hasMedia) return
           e.preventDefault()
+          if (dismissesMenu()) return // this right-click just put the menu away
+          // …and with a side panel up, right-click closes that instead. One rule, both
+          // cases: a right-click dismisses whatever is open, and only opens the menu when
+          // there's nothing to dismiss (so the menu is a second right-click away).
+          if (sidePanelOpen) {
+            window.mmp.togglePanel(sidePanelOpen)
+            return
+          }
           openMenuWindow(e.screenX, e.screenY, mini ? miniMenuItems() : undefined)
         }}
       />
