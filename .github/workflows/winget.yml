@@ -1,0 +1,31 @@
+# Submits a winget version-update PR to microsoft/winget-pkgs.
+#
+# Runs by itself whenever a GitHub release is published, so shipping a version
+# needs no extra step. It can also be run by hand (Actions → Publish to winget →
+# Run workflow) to catch up a release that was published before this file existed.
+#
+# Requires: a classic PAT with `public_repo` scope stored as the WINGET_TOKEN
+# repository secret, and a fork of microsoft/winget-pkgs under the same account.
+name: Publish to winget
+
+on:
+  release:
+    types: [released] # published, non-draft releases only — assets must be downloadable
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (e.g. v0.8.3)'
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: Yao666.Lunoir
+          # only the installer — the portable build must not become the winget package
+          installers-regex: '-setup\.exe$'
+          release-tag: ${{ inputs.tag || github.event.release.tag_name }}
+          max-versions-to-keep: 5
+          token: ${{ secrets.WINGET_TOKEN }}
