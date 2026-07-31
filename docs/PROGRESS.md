@@ -2,7 +2,7 @@
 
 > 每到相对重要的节点更新此文档。方案见 [PLAN.md](PLAN.md)。
 
-## 当前状态（2026-07-27 · v0.8.3 发布 · 交互:右键先消解再动作 + Esc 退全屏）
+## 当前状态（2026-07-29 · v0.8.3 发布 · 交互:右键先消解再动作 + Esc 退全屏）
 
 **阶段：两条交互修正。起点是一个真 bug —— 点击关闭右键菜单时视频跟着暂停了 —— 收敛出一条通用规则,顺手把一直空着的 Esc 补上。类型 / 构建全绿。**
 
@@ -30,9 +30,44 @@
 ### 发布 v0.8.3
 `package.json` 0.8.2 → 0.8.3;两个 exe(setup 108.3MB / portable 108.0MB,未签名)+ tag `v0.8.3`。
 
+### 发布后:winget 进库,并且以后自己提交（2026-07-30）
+`winget install Yao666.Lunoir` 从这天起可用。
+
+- **0.6.0 那个 PR 走的是 New-Package 通道**,必须真人 moderator 过目,开了 8 天才合(2026-07-30)。**这道关一辈子只过一次。**
+- 包一旦进库,**不更新比没进库更糟** —— winget 会一直把库里存的那个版本发给所有人。所以同天补了 `.github/workflows/winget.yml`:发布 release 即触发,自动生成清单、开 PR。版本更新走 **New-Manifest** 通道,**0.8.3 从提交到合只用了 1 小时 25 分**。
+- 只匹配 `-setup\.exe$` —— portable 不该是 winget 装出来的东西。
+- 手动补历史版本用 Actions › Publish to winget › Run workflow 填 tag(触发器只朝前看)。
+- 需要 `WINGET_TOKEN`(classic PAT,仅 `public_repo`)+ 一份 `zhbj420/winget-pkgs` fork,两样都已就位。
+
+**下载数据的读法(免得下次自己骗自己)**:0.6.0 的 setup 有 22 次下载而 portable 只有 1 次 —— winget 清单里只有 setup,所以这个不对称说明那 22 次基本都来自 winget 侧:微软的验证流水线要下载装进沙箱扫毒,镜像站(winstall / winget.run / UniGetUI)也会抓。**真人是个位数。** 反倒是 0.8.3 的 portable 有 5 次下载更有意义 —— winget 碰不到 portable,那是真有人在 release 页面上手动挑的。
+
 ### 下一轮（已规划,未动工）
-- **底部停靠 OSC**(设置可切换)—— 方案已定:窗口模式常驻+视频让位(用 `video-margin-ratio-bottom`,和标题栏同一套机制),全屏浮起+鼠标贴底触发。详见记忆 `lunoir-docked-osc-plan`。
-- **进度条缩略图** —— 调研完成:抄 MPC 的架构(**第二个 mpv 用 `--wid` 渲染进小窗**),而不是 mpv 生态的 thumbfast(传像素);固定尺寸、跟光标走、下方一条时间栏。详见记忆 `lunoir-seekbar-thumbnails`。
+1. **底部停靠 OSC**(设置可切换)—— 方案已定,详见记忆 `lunoir-docked-osc-plan`。窗口模式常驻 + 视频让位(`video-margin-ratio-bottom`,和标题栏同一套机制),全屏浮起 + 鼠标贴底触发。**建议切两刀**:① 设置项 + 停靠 bounds + 视频让位 + 不自动隐藏 +（别忘了）`fitWindowToVideo()` 也要扣掉这条栏,否则「适应视频比例」会算歪 —— 这一刀验的是机制,长相肯定丑;② 全屏贴底触发 + 宽窗口布局 + 亚克力还是实色 —— 这一刀是看着调的,也是更长的一刀。
+2. **进度条缩略图** —— 调研完成,详见记忆 `lunoir-seekbar-thumbnails`。抄 MPC 的架构(**第二个 mpv 用 `--wid` 渲染进小窗**),而不是 mpv 生态的 thumbfast(传像素);固定尺寸、跟光标走、下方一条时间栏。**待验**:MPC 的 `CanPreviewUse()` 在网络流 / 直播下怎么判,以及它是否对拖动做节流。
+3. **Emby 双向进度同步** —— 有意留成单独一轮,见下方 v0.8.1 条目里的说明。
+
+---
+
+## 版本一览
+
+| 版本 | 日期 | 一句话 |
+| --- | --- | --- |
+| v0.8.3 | 2026-07-29 | 右键先消解再动作 + Esc 退全屏 |
+| v0.8.2 | 2026-07-27 | Emby 外挂字幕 + 轨道语言名 + 分辨率标修正 |
+| v0.8.1 | 2026-07-26 | 接进 Emby:能播 + 认得出片名 + 续播真的续得上 |
+| v0.8.0 | 2026-07-24 | 画质增强 + 设置分四页 + 音量/光标两个顽固 bug |
+| v0.7.2 | 2026-07-24 | 小窗模式(PiP) + 隐藏标题栏 + 拖网址 |
+| v0.7.1 | 2026-07-23 | 直播实战修复 + 界面打磨 |
+| v0.7.0 | 2026-07-23 | 逐片段播放帧率 + 时间线片段追踪修复 |
+| v0.6.0 | 2026-07-22 | 实验性时间线 + 播放列表增强 + 检查更新 |
+| v0.5.1 | 2026-07-22 | 修复 mpv stdout 管道憋死播放器 |
+| v0.5.0 | 2026-07-21 | 收藏 library + IPTV 直播 + 录制 |
+| v0.4.0 | 2026-07-21 | 全界面多语言收官(9 语言) |
+| v0.3.0 | 2026-07-20 | 多语言基建 + 中文排版定稿 + 最大化磨砂修复 |
+| v0.2.0 | 2026-07-20 | 精简打包体积 |
+| v0.1.0 | 2026-07-20 | 更名 Lunoir(productName)+ 打包元数据 |
+
+（本地 tag 不全:`v0.3.0 / v0.4.0 / v0.7.0 / v0.7.1 / v0.7.2` 只在 GitHub 上有 release,本地仓库没有对应 tag。不影响发布,但 `git describe` 之类会跳号。）
 
 ---
 
@@ -856,20 +891,31 @@ Windows 把拖动区当**标题栏**看:右键弹**系统窗口菜单**,而且�
 
 ## 已知问题 / 风险
 
+**现存**
+
 | # | 问题 | 状态 | 备注 |
 | --- | --- | --- | --- |
-| 1 | 本机 npm 拦截 postinstall 脚本，electron 二进制未自动安装 | 已绕过 | 手动 Expand-Archive 缓存 zip 到 `node_modules/electron/dist` + 写 `path.txt`。重装依赖后可能需重做。 |
-| 2 | Windows 透明无边框窗口缩放边缘可能"飘"/闪烁 | 待验证 | Electron 透明窗口的已知限制，M3 需重点处理。 |
-| 3 | mpv 下载源 zhongfly 已 404 | 已解决 | 改用 shinchiro/mpv-winbuild-cmake。 |
-| 4 | 跨盘符解压 EXDEV（temp 在 C:，项目在 D:） | 已解决 | 直接解压到 `resources/mpv`，不经临时目录 rename。 |
-| 5 | Vite 版本与 electron-vite 2.3 peer 冲突 | 已解决 | Vite 锁定 ^5。 |
+| 1 | 安装包未签名 | 长期 | SmartScreen 会拦一下。也是「检查更新」只提示、不自动装的原因 —— 静默更新装不干净。签名要钱,暂不做。 |
+| 2 | Emby 播放进度不回传 | 待做 | Lunoir 自己记得(`positions.json`,键为 `emby:<host>/<id>`),但 Emby 那边不知道你看到哪了。见「下一轮」第 3 条。 |
+| 3 | 实验性时间线的边界 | 已知 | 逐片段帧率不跨 EDL(`container-fps-override` 传不过去)。已写进 README 的实验性说明。 |
+| 4 | PGS 字幕在 HDR 直通下无法单独调亮度 | 定性为做不了 | `image-subs-hdr-peak` 只在 mpv **做色调映射时**生效(且是反的:值越高越暗),直通时完全不起作用。MPC 那种独立压暗在 mpv 里没有对应能力。详见记忆 `mpv-pgs-hdr-subtitle-deadend`。 |
+| 5 | 本地 tag 与 GitHub release 不一致 | 无害 | 5 个版本只有 release 没有本地 tag,见「版本一览」脚注。 |
 
-## 下一步
+**已解决(留档,免得重走)**
 
-1. 用户运行 `npm run dev`，反馈实际画面 / 截图。
-2. 依反馈进入 **M3**：界面细节打磨、透明窗口缩放处理。
-3. `npm run dist` 打包 Windows 安装程序。
+| # | 问题 | 备注 |
+| --- | --- | --- |
+| 6 | 本机 npm 拦截 postinstall,electron 二进制没自动装 | 手动 Expand-Archive 缓存 zip 到 `node_modules/electron/dist` + 写 `path.txt`。**重装依赖后可能要重做。** |
+| 7 | 无边框透明窗口缩放会「飘」 | 已不成问题(当年按 M3 风险登记的,实际做下来没出现)。 |
+| 8 | mpv 下载源 zhongfly 404 | 改用 shinchiro/mpv-winbuild-cmake。 |
+| 9 | 跨盘符解压 EXDEV(temp 在 C:,项目在 D:) | 直接解压到 `resources/mpv`,不经临时目录 rename。 |
+| 10 | Vite 与 electron-vite 2.3 peer 冲突 | Vite 锁 ^5。 |
+| 11 | yt-dlp 会过期导致在线播放悄悄坏掉 | 已自愈:超过 14 天后台自动重下(`ytdlStale()`);yt-dlp 自己报 out-of-date 时立刻重下并热切换到新二进制,不用重启。设置里也有手动按钮。 |
+| 12 | SVP 4K 补帧卡顿 | **不是 Lunoir 的问题**:SVP 的 "Performance boost" 被静默重置成 Disabled,TRT 引擎降级到 1080p 档。拨回 Enabled 后 mpv 与 MPC 双双 0 丢帧。详见记忆 `svp-rife-4k-mpv-limit`。 |
 
 ## 变更日志
 
-- **2026-07-16**：项目启动；确定技术栈（Electron+React、内置 mpv）；完成 M0/M1/M2；建立 PLAN/PROGRESS 文档与协作约定。
+版本层面的记录见上方「版本一览」;每个版本干了什么见对应的「历史状态」条目。
+
+- **2026-07-16**：项目启动;确定技术栈(Electron + React、内置 mpv);完成 M0/M1/M2;建立 PLAN/PROGRESS 文档与协作约定。
+- **2026-07-30**：`winget install Yao666.Lunoir` 上线,版本更新改由 GitHub Action 自动提交。
