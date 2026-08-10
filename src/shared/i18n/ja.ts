@@ -45,6 +45,8 @@ export const ja: Partial<Record<Key, string>> = {
   'lib.live': 'ライブ',
   'lib.emptyPlaylists': '保存したプレイリストがありません。プレイリストパネルから保存できます。',
   'lib.emptyLive': '保存したライブソースがありません。',
+  'lib.clearRecents': 'クリア',
+  'lib.clearConfirm': 'すべて消去？',
   'common.collapse': 'パネルを折りたたむ',
   'common.default': '既定',
 
@@ -159,6 +161,12 @@ export const ja: Partial<Record<Key, string>> = {
     'スクリーンショットの保存先。パスを入力するか参照してください。',
   'set.shotDir.browse': '参照…',
 
+  'set.oscStyle.label': 'コントロールの表示方法',
+  'set.oscStyle.desc1':
+    'フローティング：映像の上に浮かぶコンパクトなバー。しばらく操作しないと隠れます。',
+  'set.oscStyle.desc2':
+    'ドッキング：ウィンドウ下端に全幅で表示します。ウィンドウ表示では映像側が場所を空けるため、映像を隠すことも、自動的に消えることもありません。',
+
   'set.oscDelay.label': '自動的に隠すまでの時間',
   'set.oscDelay.desc1':
     'ポインターが止まってから、画面上のコントロールが表示され続ける時間。',
@@ -174,6 +182,8 @@ export const ja: Partial<Record<Key, string>> = {
   'opt.deint.on': '常に有効',
   'opt.deint.off': 'オフ',
   'opt.quality.best': '最高',
+  'opt.oscStyle.floating': 'フローティング',
+  'opt.oscStyle.docked': '下端にドッキング',
   'opt.shot.png': 'PNG（無劣化）',
   'opt.shot.jpg': 'JPG（高品質）',
   'opt.subFont.system': 'システム既定（sans-serif）',

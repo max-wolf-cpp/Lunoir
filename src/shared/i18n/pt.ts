@@ -43,6 +43,8 @@ export const pt: Partial<Record<Key, string>> = {
   'lib.live': 'Ao vivo',
   'lib.emptyPlaylists': 'Ainda não há listas guardadas. Guarde uma no painel de lista.',
   'lib.emptyLive': 'Ainda não há fontes ao vivo guardadas.',
+  'lib.clearRecents': 'Limpar',
+  'lib.clearConfirm': 'Limpar tudo?',
   'common.collapse': 'Recolher painel',
   'common.default': 'Predefinido',
 
@@ -157,6 +159,12 @@ export const pt: Partial<Record<Key, string>> = {
     'Onde as capturas são guardadas. Escreva um caminho ou procure.',
   'set.shotDir.browse': 'Procurar…',
 
+  'set.oscStyle.label': 'Estilo dos controlos',
+  'set.oscStyle.desc1':
+    'Flutuante: uma barra compacta sobre a imagem, ocultada após um momento sem atividade.',
+  'set.oscStyle.desc2':
+    'Fixa: a toda a largura, no fundo da janela. Em modo de janela o vídeo abre espaço para ela, por isso nunca tapa a imagem nem se oculta.',
+
   'set.oscDelay.label': 'Atraso de ocultação automática',
   'set.oscDelay.desc1':
     'Durante quanto tempo os controlos no ecrã permanecem visíveis após o ponteiro parar.',
@@ -172,6 +180,8 @@ export const pt: Partial<Record<Key, string>> = {
   'opt.deint.on': 'Sempre ativo',
   'opt.deint.off': 'Desligado',
   'opt.quality.best': 'Máxima',
+  'opt.oscStyle.floating': 'Flutuante',
+  'opt.oscStyle.docked': 'Fixa em baixo',
   'opt.shot.png': 'PNG (sem perdas)',
   'opt.shot.jpg': 'JPG (alta qualidade)',
   'opt.subFont.system': 'Predefinição do sistema (sans-serif)',

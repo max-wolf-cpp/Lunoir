@@ -20,6 +20,10 @@ const DEFAULTS: Settings = {
   audioPassthrough: false,
   passthroughCodecs: 'ac3,eac3,truehd,dts,dts-hd',
   oscHideDelay: 5, // seconds the OSC lingers after activity before auto-hiding
+  // 'floating' keeps the IINA-style pill over the picture. 'docked' puts a full-width
+  // bar at the window's bottom edge and — windowed — reserves the strip from the video
+  // so the controls never cover it, and never auto-hide.
+  oscStyle: 'floating',
   frostStrength: 50, // 0..100, higher = more see-through; 50 ≈ the default alpha 0.40
   subHdrPeak: 120, // dimmer than mpv's ~SDR-white default so HDR subs aren't harsh
   hwdec: 'auto',

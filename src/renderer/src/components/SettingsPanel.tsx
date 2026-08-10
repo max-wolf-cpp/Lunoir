@@ -36,6 +36,7 @@ interface Settings {
   audioPassthrough: boolean
   passthroughCodecs: string
   oscHideDelay: number
+  oscStyle: 'floating' | 'docked'
   frostStrength: number
   subHdrPeak: number
   hwdec: 'auto' | 'auto-copy' | 'no'
@@ -135,6 +136,10 @@ const subFontOpts = (t: T): Opt[] => [
 const screenshotFmtOpts = (t: T): Opt[] => [
   { value: 'png', label: t('opt.shot.png') },
   { value: 'jpg', label: t('opt.shot.jpg') }
+]
+const oscStyleOpts = (t: T): Opt[] => [
+  { value: 'floating', label: t('opt.oscStyle.floating') },
+  { value: 'docked', label: t('opt.oscStyle.docked') }
 ]
 // mpv audio-spdif codec names → human labels (Atmos rides on TrueHD, DTS:X on DTS-HD)
 const PASSTHROUGH_CODECS = [
@@ -822,6 +827,22 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
 
           {tab === 'interface' && (<>
           <div className="set-sec">{t('set.sec.controls')}</div>
+          <Row
+            label={t('set.oscStyle.label')}
+            desc={
+              <>
+                {t('set.oscStyle.desc1')}
+                <br />
+                {t('set.oscStyle.desc2')}
+              </>
+            }
+          >
+            <Select
+              value={s.oscStyle}
+              options={oscStyleOpts(t)}
+              onChange={v => set('oscStyle', v as Settings['oscStyle'])}
+            />
+          </Row>
           <Row
             label={t('set.oscDelay.label')}
             desc={

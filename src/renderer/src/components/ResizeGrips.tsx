@@ -1,10 +1,12 @@
 import { useRef } from 'react'
 
-// A panel window docks over the main window's edge, so it covers the OS resize
-// border there. These invisible grips restore resizing: dragging one resizes the
-// MAIN window. The right-docked panel exposes e/s/se (top-left anchored); the
-// left-docked panel exposes w/s/sw (top-right anchored — the left edge moves).
-type Edge = 'e' | 'w' | 's' | 'se' | 'sw'
+// A child window docked over the main window's edge covers the OS resize border
+// there. These invisible grips restore resizing: dragging one resizes the MAIN
+// window. The right-docked panel exposes e/s/se (top-left anchored); the
+// left-docked panel exposes w/s/sw (top-right anchored — the left edge moves);
+// the docked OSC sits on the bottom, so it takes s plus whichever bottom corners
+// no open panel has already claimed (main works that set out and pushes it).
+export type Edge = 'e' | 'w' | 's' | 'se' | 'sw'
 
 const WIN_MIN_W = 850 // = WIN_MIN_W in main; keep the anchored edge fixed at the min
 const WIN_MIN_H = 320

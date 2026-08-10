@@ -46,6 +46,8 @@ export const zhCN: Partial<Record<Key, string>> = {
   'lib.live': '直播源',
   'lib.emptyPlaylists': '还没有保存的播放列表。可在播放列表面板里保存。',
   'lib.emptyLive': '还没有收藏的直播源。',
+  'lib.clearRecents': '清空',
+  'lib.clearConfirm': '确认清空？',
 
   // ---- 设置面板 ----
   'set.sec.interface': '界面',
@@ -146,6 +148,12 @@ export const zhCN: Partial<Record<Key, string>> = {
   'set.shotDir.desc': '截图保存的位置。可直接输入路径，或点击浏览选择。',
   'set.shotDir.browse': '浏览…',
 
+  'set.oscStyle.label': '控制栏样式',
+  'set.oscStyle.desc1':
+    '悬浮：画面之上的一条紧凑控制栏，停顿片刻后自动隐藏。',
+  'set.oscStyle.desc2':
+    '停靠：贴在窗口底部、左右通栏。窗口模式下视频会主动让位——永不遮挡画面，也不会隐藏。',
+
   'set.oscDelay.label': '控制器自动隐藏时间',
   'set.oscDelay.desc1': '鼠标停止移动后，控制器保持显示的时间。',
   'set.oscDelay.desc2': '默认为 5 秒。',
@@ -160,6 +168,8 @@ export const zhCN: Partial<Record<Key, string>> = {
   'opt.deint.on': '始终开启',
   'opt.deint.off': '关闭',
   'opt.quality.best': '最高',
+  'opt.oscStyle.floating': '悬浮',
+  'opt.oscStyle.docked': '底部停靠',
   'opt.shot.png': 'PNG（无损）',
   'opt.shot.jpg': 'JPG（高质量）',
   'opt.subFont.system': '系统默认（sans-serif）',

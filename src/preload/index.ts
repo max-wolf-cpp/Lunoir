@@ -10,6 +10,9 @@ export type StreamQuality = 'best' | '2160' | '1080' | '720' | '480'
 export type ScreenshotFormat = 'png' | 'jpg'
 /** How the OSC prints position/duration. Click the readout to cycle. */
 export type TimeFormat = 'time' | 'timecode' | 'frame'
+/** Where the controls live. 'floating' = the IINA-style pill over the picture;
+ *  'docked' = a full-width bar at the window's bottom edge, outside the video. */
+export type OscStyle = 'floating' | 'docked'
 export interface Settings {
   uiLanguage: LangSetting // interface language; 'system' follows the OS locale
   scanFolderIntoPlaylist: boolean
@@ -29,6 +32,7 @@ export interface Settings {
   audioPassthrough: boolean // bitstream compressed audio to an external receiver (mpv audio-spdif)
   passthroughCodecs: string // which formats to passthrough (comma list: ac3,eac3,truehd,dts,dts-hd)
   oscHideDelay: number // seconds the OSC stays before auto-hiding
+  oscStyle: OscStyle // floating pill over the picture, or a bar docked at the bottom edge
   frostStrength: number // 0..100 → acrylic panel scrim alpha (lower = more see-through)
   subHdrPeak: number // peak nits for subtitles over HDR video (mpv sub-hdr-peak)
   hwdec: Hwdec
@@ -283,8 +287,14 @@ const api = {
     subscribe('ui:panel-width', (w: number) => cb(w)),
   onPanelReveal: (cb: (open: boolean) => void): Unsubscribe =>
     subscribe('panel:reveal', (open: boolean) => cb(open)),
+  // which window edges the docked OSC has to restore resizing on (it covers them);
+  // main decides, since it depends on style + fullscreen/maximized + which panel is open
+  onOscGrips: (cb: (edges: string[]) => void): Unsubscribe =>
+    subscribe('osc:grips', (edges: string[]) => cb(edges)),
 
   // --- app / window ---
+  // "React mounted" — main can't tell from did-finish-load alone (see main.tsx)
+  rendererReady: (): void => ipcRenderer.send('ui:renderer-ready'),
   openDialog: (): Promise<string | null> => ipcRenderer.invoke('app:open-dialog'),
   openDiscDialog: (): void => ipcRenderer.send('ui:open-disc'), // Blu-ray/DVD folder picker
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('app:pick-folder'),

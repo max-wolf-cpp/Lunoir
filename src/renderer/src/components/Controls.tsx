@@ -95,6 +95,9 @@ interface Props {
   onFullscreen: () => void
   timeFormat: TimeFormat
   onCycleTimeFormat: () => void
+  /** Docked style: fold everything into one row (half the height) instead of the
+   *  floating pill's buttons-over-seek stack. */
+  docked?: boolean
 }
 
 /**
@@ -249,221 +252,244 @@ export default function Controls(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.volume])
 
+  // ---- The controls, extracted once so the two arrangements can compose them ----
+  // Floating keeps the IINA shape: buttons on one row, seek on another. Docked folds
+  // everything into a single row, which is the whole point of it — a bar along the
+  // bottom edge should cost as little height as possible. Same pieces either way; the
+  // seek bar in particular carries A-B markers, clip boundaries and the trim handles,
+  // and none of that wants to exist twice.
+  const volumeGrp = (
+    <>
+      {/* tooltip tracks what the click will do, not the icon: at volume 0
+          but un-muted the glyph reads muted, yet clicking still mutes */}
+      <button
+        className="ib s"
+        onClick={props.onToggleMute}
+        title={state.mute ? t('osc.unmute') : t('osc.mute')}
+      >
+        {state.mute || state.volume === 0 ? <IcMute /> : <IcVolume />}
+      </button>
+      <div className="vol-wrap">
+        {volShow && <span className="vol-num">{Math.round(state.volume)}</span>}
+        <input
+          className="rng volume"
+          type="range"
+          min={0}
+          max={150}
+          value={state.mute ? 0 : state.volume}
+          style={{ ['--fill' as any]: `${volPct}%` }}
+          onChange={e => props.onSetVolume(Number(e.target.value))}
+          onPointerDown={showVol}
+        />
+      </div>
+    </>
+  )
+
+  const transportGrp = (
+    <>
+      <button className="ib" onClick={() => props.onSeekBy(-10)} title={t('osc.back', { n: 10 })}>
+        <IcRewind />
+      </button>
+      <button
+        className="ib play"
+        onClick={props.onTogglePause}
+        title={state.pause ? t('osc.play') : t('osc.pause')}
+      >
+        {state.pause ? <IcPlay /> : <IcPause />}
+      </button>
+      <button className="ib" onClick={() => props.onSeekBy(10)} title={t('osc.forward', { n: 10 })}>
+        <IcForward />
+      </button>
+    </>
+  )
+
+  const recPill = rec.recording && (
+    <button
+      className="rec-pill"
+      title={t('menu.stopRecord')}
+      onClick={() => window.mmp.toggleRecording()}
+    >
+      <span className="rec-dot" />
+      {fmt(recElapsed)}
+    </button>
+  )
+
+  // content marks (resolution/HDR + audio format). Stacked in two lines for the
+  // floating pill, side by side in the docked bar — one row has the width to spare
+  // and no height to waste.
+  const fmtBadges = (topBadge || audio) && (
+    <div className="osc-fmt">
+      {topBadge && <span className="fmt-badge">{topBadge}</span>}
+      {audio && <span className="fmt-badge">{audio}</span>}
+    </div>
+  )
+
+  const menuBtns = (
+    <>
+      <button
+        className="ib s"
+        title={t('osc.library')}
+        onClick={() => window.mmp.toggleLibrary()}
+      >
+        <IcSaved />
+      </button>
+      <button
+        className={`ib s ${settingsOpen ? 'on' : ''}`}
+        title={t('common.settings')}
+        onClick={() => window.mmp.togglePanel('settings')}
+      >
+        <IcGear />
+      </button>
+      <button
+        className={`ib s ${panelOpen ? 'on' : ''}`}
+        title={t('osc.panel')}
+        onClick={() => window.mmp.togglePanel('playlist')}
+      >
+        <IcList />
+      </button>
+    </>
+  )
+
+  // the clip's rate in a timeline (a bare "0.5005×" would be noise), else the
+  // user's speed. `.set` tints the ones you overrode, like the panel's badge.
+  const speedBadge =
+    clipRate > 0 ? (
+      <span className={`osc-speed${state.clipFps > 0 ? ' set' : ''}`}>{+clipRate.toFixed(3)} fps</span>
+    ) : (
+      Math.abs(state.speed - 1) > 0.01 && <span className="osc-speed">{+state.speed.toFixed(2)}×</span>
+    )
+
+  // Seek — or, on a live stream, elapsed time + a LIVE badge (no bar). Live has no
+  // real duration; drawing position/duration made the fill snap backwards as mpv's
+  // estimated duration crept up with the arriving buffer.
+  const seekBody = state.isLive ? (
+    <>
+      <span className="t cur">{fmt(state.timePos)}</span>
+      <div className="seek-wrap" />
+      {speedBadge}
+      <button className="t dur live-badge" title="Go to live" onClick={() => window.mmp.goLive()}>
+        <span className="live-dot" />
+        LIVE
+      </button>
+    </>
+  ) : (
+    <>
+      <span className="t cur clickable" onClick={props.onCycleTimeFormat} title={t('osc.timeFormat')}>
+        {props.timeFormat === 'timecode'
+          ? tcFromFrame(frameOf(state), state.fps)
+          : props.timeFormat === 'frame'
+            ? String(frameOf(state))
+            : fmt(headPos)}
+      </span>
+      <div className="seek-wrap" ref={seekRef}>
+        <input
+          className="rng seek"
+          type="range"
+          min={0}
+          max={state.duration || 0}
+          step={0.1}
+          value={headPos}
+          style={{ ['--fill' as any]: `${abPct(headPos)}%` }}
+          onChange={e => {
+            if (trimAnchor != null) setTrimAnchor(null) // manual scrub takes over from the trim anchor
+            props.onSeek(Number(e.target.value))
+          }}
+        />
+        {/* clip boundaries when merged ("watch as one"); skip the first (t=0).
+            clipStarts, not chapters — a stitched Blu-ray rip brings its own. */}
+        {state.merge &&
+          state.clipStarts.slice(1).map((t, i) => (
+            <span key={i} className="clip-mark" style={{ left: `${abPct(t)}%` }} />
+          ))}
+        {state.abLoopA != null && state.abLoopB != null && (
+          <span
+            className="ab-region"
+            style={{ left: `${abPct(state.abLoopA)}%`, width: `${abPct(state.abLoopB) - abPct(state.abLoopA)}%` }}
+          />
+        )}
+        {state.abLoopA != null && <span className="ab-mark" style={{ left: `${abPct(state.abLoopA)}%` }} />}
+        {state.abLoopB != null && <span className="ab-mark" style={{ left: `${abPct(state.abLoopB)}%` }} />}
+        {trimming && (
+          <>
+            <span
+              className="trim-range"
+              style={{ left: `${abPct(state.trimIn)}%`, width: `${abPct(state.trimOut) - abPct(state.trimIn)}%` }}
+            />
+            <span
+              className="trim-handle"
+              style={{ left: `${abPct(state.trimIn)}%` }}
+              onPointerDown={dragTrim('in')}
+              onDoubleClick={() => {
+                setTrimAnchor(null) // real playhead jump, not a preview
+                props.onSeek(state.trimIn)
+              }}
+            />
+            <span
+              className="trim-handle"
+              style={{ left: `${abPct(state.trimOut)}%` }}
+              onPointerDown={dragTrim('out')}
+              onDoubleClick={() => {
+                setTrimAnchor(null)
+                props.onSeek(state.trimOut)
+              }}
+            />
+          </>
+        )}
+      </div>
+      {speedBadge}
+      <span className="t dur clickable" onClick={props.onCycleTimeFormat} title={t('osc.timeFormat')}>
+        {props.timeFormat === 'timecode'
+          ? tcFromFrame(state.frameCount || Math.floor(state.duration * state.fps), state.fps)
+          : props.timeFormat === 'frame'
+            ? String(state.frameCount || Math.floor(state.duration * state.fps) || 0)
+            : fmt(state.duration)}
+      </span>
+      {trimming && (
+        <button className="trim-reset" title={t('timeline.resetRange')} onClick={() => window.mmp.resetTrim()}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+            <path d="M3 3v5h5" />
+          </svg>
+        </button>
+      )}
+    </>
+  )
+
+  // Docked: one row — transport, the stretchy seek section, volume, the format
+  // marks, then the menu buttons. Reads left-to-right in order of how often you
+  // reach for it, and costs about half the floating pill's height.
+  if (props.docked) {
+    return (
+      <div className="osc docked">
+        <div className="osc-row osc-dock">
+          <div className="grp center">{transportGrp}</div>
+          {/* osc-row carries the flex — osc-seek alone is not a flex container, and
+              without it the readouts and the bar stack into three lines */}
+          <div className="osc-row osc-seek">{seekBody}</div>
+          <div className="grp">{volumeGrp}</div>
+          {recPill}
+          {fmtBadges}
+          <div className="grp right">{menuBtns}</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="osc">
       {/* Row 1: buttons */}
       <div className="osc-row osc-buttons">
-        <div className="grp left">
-          {/* tooltip tracks what the click will do, not the icon: at volume 0
-              but un-muted the glyph reads muted, yet clicking still mutes */}
-          <button
-            className="ib s"
-            onClick={props.onToggleMute}
-            title={state.mute ? t('osc.unmute') : t('osc.mute')}
-          >
-            {state.mute || state.volume === 0 ? <IcMute /> : <IcVolume />}
-          </button>
-          <div className="vol-wrap">
-            {volShow && <span className="vol-num">{Math.round(state.volume)}</span>}
-            <input
-              className="rng volume"
-              type="range"
-              min={0}
-              max={150}
-              value={state.mute ? 0 : state.volume}
-              style={{ ['--fill' as any]: `${volPct}%` }}
-              onChange={e => props.onSetVolume(Number(e.target.value))}
-              onPointerDown={showVol}
-            />
-          </div>
-        </div>
-
-        <div className="grp center">
-          <button className="ib" onClick={() => props.onSeekBy(-10)} title={t('osc.back', { n: 10 })}>
-            <IcRewind />
-          </button>
-          <button
-            className="ib play"
-            onClick={props.onTogglePause}
-            title={state.pause ? t('osc.play') : t('osc.pause')}
-          >
-            {state.pause ? <IcPlay /> : <IcPause />}
-          </button>
-          <button className="ib" onClick={() => props.onSeekBy(10)} title={t('osc.forward', { n: 10 })}>
-            <IcForward />
-          </button>
-        </div>
-
+        <div className="grp left">{volumeGrp}</div>
+        <div className="grp center">{transportGrp}</div>
         <div className="grp right">
-          {rec.recording && (
-            <button
-              className="rec-pill"
-              title={t('menu.stopRecord')}
-              onClick={() => window.mmp.toggleRecording()}
-            >
-              <span className="rec-dot" />
-              {fmt(recElapsed)}
-            </button>
-          )}
-          {(topBadge || audio) && (
-            <div className="osc-fmt">
-              {topBadge && <span className="fmt-badge">{topBadge}</span>}
-              {audio && <span className="fmt-badge">{audio}</span>}
-            </div>
-          )}
-          <button
-            className="ib s"
-            title={t('osc.library')}
-            onClick={() => window.mmp.toggleLibrary()}
-          >
-            <IcSaved />
-          </button>
-          <button
-            className={`ib s ${settingsOpen ? 'on' : ''}`}
-            title={t('common.settings')}
-            onClick={() => window.mmp.togglePanel('settings')}
-          >
-            <IcGear />
-          </button>
-          <button
-            className={`ib s ${panelOpen ? 'on' : ''}`}
-            title={t('osc.panel')}
-            onClick={() => window.mmp.togglePanel('playlist')}
-          >
-            <IcList />
-          </button>
+          {recPill}
+          {fmtBadges}
+          {menuBtns}
         </div>
       </div>
 
-      {/* Row 2: seek — or, on a live stream, elapsed time + a LIVE badge (no bar).
-          Live has no real duration; drawing position/duration made the fill snap
-          backwards as mpv's estimated duration crept up with the arriving buffer. */}
-      <div className="osc-row osc-seek">
-        {state.isLive ? (
-          <>
-            <span className="t cur">{fmt(state.timePos)}</span>
-            <div className="seek-wrap" />
-            {/* the clip's rate in a timeline (a bare "0.5005×" would be noise), else the
-                user's speed. `.set` tints the ones you overrode, like the panel's badge. */}
-            {clipRate > 0 ? (
-              <span className={`osc-speed${state.clipFps > 0 ? ' set' : ''}`}>
-                {+clipRate.toFixed(3)} fps
-              </span>
-            ) : (
-              Math.abs(state.speed - 1) > 0.01 && (
-                <span className="osc-speed">{+state.speed.toFixed(2)}×</span>
-              )
-            )}
-            <button className="t dur live-badge" title="Go to live" onClick={() => window.mmp.goLive()}>
-              <span className="live-dot" />
-              LIVE
-            </button>
-          </>
-        ) : (
-          <>
-            <span
-              className="t cur clickable"
-              onClick={props.onCycleTimeFormat}
-              title={t('osc.timeFormat')}
-            >
-              {props.timeFormat === 'timecode'
-                ? tcFromFrame(frameOf(state), state.fps)
-                : props.timeFormat === 'frame'
-                  ? String(frameOf(state))
-                  : fmt(headPos)}
-            </span>
-            <div className="seek-wrap" ref={seekRef}>
-              <input
-                className="rng seek"
-                type="range"
-                min={0}
-                max={state.duration || 0}
-                step={0.1}
-                value={headPos}
-                style={{ ['--fill' as any]: `${abPct(headPos)}%` }}
-                onChange={e => {
-                  if (trimAnchor != null) setTrimAnchor(null) // manual scrub takes over from the trim anchor
-                  props.onSeek(Number(e.target.value))
-                }}
-              />
-              {/* clip boundaries when merged ("watch as one"); skip the first (t=0).
-                  clipStarts, not chapters — a stitched Blu-ray rip brings its own. */}
-              {state.merge &&
-                state.clipStarts.slice(1).map((t, i) => (
-                  <span key={i} className="clip-mark" style={{ left: `${abPct(t)}%` }} />
-                ))}
-              {state.abLoopA != null && state.abLoopB != null && (
-                <span
-                  className="ab-region"
-                  style={{ left: `${abPct(state.abLoopA)}%`, width: `${abPct(state.abLoopB) - abPct(state.abLoopA)}%` }}
-                />
-              )}
-              {state.abLoopA != null && <span className="ab-mark" style={{ left: `${abPct(state.abLoopA)}%` }} />}
-              {state.abLoopB != null && <span className="ab-mark" style={{ left: `${abPct(state.abLoopB)}%` }} />}
-              {trimming && (
-                <>
-                  <span
-                    className="trim-range"
-                    style={{ left: `${abPct(state.trimIn)}%`, width: `${abPct(state.trimOut) - abPct(state.trimIn)}%` }}
-                  />
-                  <span
-                    className="trim-handle"
-                    style={{ left: `${abPct(state.trimIn)}%` }}
-                    onPointerDown={dragTrim('in')}
-                    onDoubleClick={() => {
-                      setTrimAnchor(null) // real playhead jump, not a preview
-                      props.onSeek(state.trimIn)
-                    }}
-                  />
-                  <span
-                    className="trim-handle"
-                    style={{ left: `${abPct(state.trimOut)}%` }}
-                    onPointerDown={dragTrim('out')}
-                    onDoubleClick={() => {
-                      setTrimAnchor(null)
-                      props.onSeek(state.trimOut)
-                    }}
-                  />
-                </>
-              )}
-            </div>
-            {/* the clip's rate in a timeline (a bare "0.5005×" would be noise), else the
-                user's speed. `.set` tints the ones you overrode, like the panel's badge. */}
-            {clipRate > 0 ? (
-              <span className={`osc-speed${state.clipFps > 0 ? ' set' : ''}`}>
-                {+clipRate.toFixed(3)} fps
-              </span>
-            ) : (
-              Math.abs(state.speed - 1) > 0.01 && (
-                <span className="osc-speed">{+state.speed.toFixed(2)}×</span>
-              )
-            )}
-            <span
-              className="t dur clickable"
-              onClick={props.onCycleTimeFormat}
-              title={t('osc.timeFormat')}
-            >
-              {props.timeFormat === 'timecode'
-                ? tcFromFrame(state.frameCount || Math.floor(state.duration * state.fps), state.fps)
-                : props.timeFormat === 'frame'
-                  ? String(state.frameCount || Math.floor(state.duration * state.fps) || 0)
-                  : fmt(state.duration)}
-            </span>
-            {trimming && (
-              <button
-                className="trim-reset"
-                title={t('timeline.resetRange')}
-                onClick={() => window.mmp.resetTrim()}
-              >
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-                  <path d="M3 3v5h5" />
-                </svg>
-              </button>
-            )}
-          </>
-        )}
-      </div>
+      {/* Row 2: seek (see seekBody — it also carries the live-stream variant) */}
+      <div className="osc-row osc-seek">{seekBody}</div>
     </div>
   )
 }

@@ -21,6 +21,10 @@ export default function Library() {
   const [editing, setEditing] = useState<string | null>(null) // target being renamed
   const [draft, setDraft] = useState('')
   const revert = useRef(false)
+  // Clearing the history can't be undone, and this app has no modal dialogs — so the
+  // button asks for the second click itself, and forgets after a few seconds.
+  const [armed, setArmed] = useState(false)
+  const armTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const startRename = (e: Entry): void => {
     revert.current = false
@@ -46,6 +50,27 @@ export default function Library() {
       offF()
     }
   }, [])
+
+  const disarm = (): void => {
+    if (armTimer.current) clearTimeout(armTimer.current)
+    armTimer.current = null
+    setArmed(false)
+  }
+  const clearRecents = (): void => {
+    if (!armed) {
+      setArmed(true)
+      armTimer.current = setTimeout(() => setArmed(false), 3000)
+      return
+    }
+    disarm()
+    window.mmp.clearRecents()
+  }
+
+  // leaving 最近 (or unmounting) drops a pending confirmation
+  useEffect(() => {
+    if (tab !== 'recent') disarm()
+  }, [tab])
+  useEffect(() => disarm, [])
 
   const play = (target: string): void => window.mmp.playTarget(target) // main closes the overlay
 
@@ -80,11 +105,23 @@ export default function Library() {
             </button>
           ))}
         </div>
-        <button className="lib-close" title={t('common.close')} onClick={() => window.mmp.closeLibrary()}>
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <path d="M6 6 L18 18 M18 6 L6 18" />
-          </svg>
-        </button>
+        <div className="lib-head-actions">
+          {tab === 'recent' && recents.length > 0 && (
+            <button
+              className={armed ? 'lib-clear armed' : 'lib-clear'}
+              title={t('lib.clearRecents')}
+              onClick={clearRecents}
+              onBlur={disarm}
+            >
+              {armed ? t('lib.clearConfirm') : t('lib.clearRecents')}
+            </button>
+          )}
+          <button className="lib-close" title={t('common.close')} onClick={() => window.mmp.closeLibrary()}>
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 6 L18 18 M18 6 L6 18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="lib-body">

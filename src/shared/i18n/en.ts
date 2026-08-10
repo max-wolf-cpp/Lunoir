@@ -58,6 +58,8 @@ export const en = {
   'lib.live': 'Live',
   'lib.emptyPlaylists': 'No saved playlists yet. Save one from the playlist panel.',
   'lib.emptyLive': 'No saved live sources yet.',
+  'lib.clearRecents': 'Clear',
+  'lib.clearConfirm': 'Clear all?',
 
   // ---- settings panel ----
   // Register: plain, complete sentences. State what the setting does and what it
@@ -182,6 +184,12 @@ export const en = {
   'set.recDir.label': 'Recording folder',
   'set.recDir.desc': 'Where live recordings are saved. Enter a path or browse for one.',
 
+  'set.oscStyle.label': 'Controls style',
+  'set.oscStyle.desc1':
+    'Floating: a compact bar over the picture, hidden after a moment of inactivity.',
+  'set.oscStyle.desc2':
+    'Docked: full width at the bottom of the window. Windowed, the video makes room for it — so it never covers the picture, and never hides.',
+
   'set.oscDelay.label': 'Auto-hide delay',
   'set.oscDelay.desc1':
     'How long the on-screen controls remain visible after the pointer stops moving.',
@@ -228,6 +236,8 @@ export const en = {
   'opt.deint.on': 'Always on',
   'opt.deint.off': 'Off',
   'opt.quality.best': 'Best',
+  'opt.oscStyle.floating': 'Floating',
+  'opt.oscStyle.docked': 'Docked',
   'opt.shot.png': 'PNG (lossless)',
   'opt.shot.jpg': 'JPG (high quality)',
   'opt.subFont.system': 'System default (sans-serif)',

@@ -44,6 +44,8 @@ export const ru: Partial<Record<Key, string>> = {
   'lib.live': 'Эфир',
   'lib.emptyPlaylists': 'Пока нет сохранённых плейлистов. Сохраните из панели плейлиста.',
   'lib.emptyLive': 'Пока нет сохранённых источников эфира.',
+  'lib.clearRecents': 'Очистить',
+  'lib.clearConfirm': 'Очистить всё?',
   'common.collapse': 'Свернуть панель',
   'common.default': 'По умолчанию',
 
@@ -158,6 +160,12 @@ export const ru: Partial<Record<Key, string>> = {
     'Куда сохраняются скриншоты. Введите путь или выберите.',
   'set.shotDir.browse': 'Обзор…',
 
+  'set.oscStyle.label': 'Стиль элементов управления',
+  'set.oscStyle.desc1':
+    'Плавающие: компактная панель поверх изображения, скрывается после паузы.',
+  'set.oscStyle.desc2':
+    'Закреплённые: во всю ширину внизу окна. В оконном режиме видео уступает ей место — она никогда не закрывает изображение и не скрывается.',
+
   'set.oscDelay.label': 'Задержка автоскрытия',
   'set.oscDelay.desc1':
     'Как долго экранные элементы управления остаются видимыми после остановки указателя.',
@@ -173,6 +181,8 @@ export const ru: Partial<Record<Key, string>> = {
   'opt.deint.on': 'Всегда включён',
   'opt.deint.off': 'Выключен',
   'opt.quality.best': 'Лучшее',
+  'opt.oscStyle.floating': 'Плавающие',
+  'opt.oscStyle.docked': 'Закреплённые внизу',
   'opt.shot.png': 'PNG (без потерь)',
   'opt.shot.jpg': 'JPG (высокое качество)',
   'opt.subFont.system': 'Системный по умолчанию (sans-serif)',

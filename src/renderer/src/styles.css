@@ -631,6 +631,97 @@ body.fullscreen .titlebar {
   pointer-events: none;
 }
 
+/* ---------- Docked OSC: one row, half the height ----------
+   The bar runs the full free width of the window, flush with its bottom edge (the
+   window's corners are squared off from the main process — the radius belongs to the
+   window, not this panel). Windowed, the video has already given up this strip, so
+   nothing here overlaps the picture.
+
+   Being along the bottom edge, height is the scarce resource and width is plentiful:
+   everything folds into a single row — transport, seek, volume, format marks, menu —
+   so the strip costs ~48px instead of the floating pill's 92. The glyphs shrink to
+   match; the floating pill's own sizes are untouched (its scale is tuned and locked). */
+.osc.docked {
+  justify-content: center;
+  gap: 0;
+  padding: 0 14px;
+}
+
+/* transport | seek (elastic) | volume · format marks · menu (one fixed cluster) */
+.osc-dock {
+  gap: 14px;
+}
+
+/* the seek section is the only elastic part — it eats whatever the fixed groups leave */
+.osc.docked .osc-seek {
+  flex: 1;
+  min-width: 0;
+  top: 0; /* drop the floating layout's -8px lift: there's no second row to lift away from */
+  padding: 0;
+}
+
+/* The seek bar is the ONLY thing on this row whose length changes. Everything after it
+   — volume, the format marks, the menu buttons — is one fixed cluster packed against the
+   right edge, so the layout only ever breathes in the middle.
+   `.grp.right` is `flex: 1` in the floating layout, where it owns a row and uses the
+   stretch to push its buttons to the far edge; on one shared row that competed with the
+   seek bar (two `flex: 1` siblings split the slack evenly, leaving a wide gap after the
+   format marks). And `flex: none` on the rest keeps a narrow window from squeezing the
+   volume slider instead of the bar. */
+.osc.docked .grp,
+.osc.docked .grp.right {
+  flex: none;
+}
+
+/* the two readouts sit beside the bar, not above/below it: never wrap, never shrink
+   (the base rule's min-width + tabular figures keep the bar from jittering as the
+   digits change) */
+.osc.docked .osc-seek .t {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* Transport at full size — the play/step buttons are what you actually aim at, so they
+   keep the floating pill's glyph scale and the bar grows to fit them rather than the
+   other way round. Everything else on the row stays small. */
+.osc.docked .ib.play svg {
+  width: 44px;
+  height: 44px;
+}
+
+.osc.docked .ib.play {
+  padding: 2px;
+}
+
+.osc.docked .grp.center .ib svg {
+  width: 36px;
+  height: 36px;
+}
+
+.osc.docked .ib,
+.osc.docked .ib.s {
+  padding: 4px;
+}
+
+.osc.docked .grp.center {
+  gap: 2px;
+}
+
+/* the format marks go side by side here — a row has width to spare and no height
+   to waste (they stack in the floating pill) */
+.osc.docked .osc-fmt {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-right: 0;
+}
+
+/* the row has width to spare, so the volume slider gets more travel than the floating
+   pill's 92px — finer control, and it fills the space the fixed cluster would leave */
+.osc.docked .volume {
+  width: 120px;
+}
+
 .osc {
   /* fills the acrylic window; the window itself provides the frosted background,
      rounded corners and shadow, so the panel stays transparent */
@@ -1198,6 +1289,49 @@ body.library-win.library-shown .library {
 }
 /* Chinese tabs: bigger + looser (uppercase does nothing to hanzi). English locked. */
 :root[data-cjk] .lib-tabs button {
+  font-size: 14px;
+  letter-spacing: 0.18em;
+}
+
+.lib-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Clear-history: a quiet text button until armed, then a red confirm. */
+.lib-clear {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+@media (hover: hover) {
+  .lib-clear:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.72);
+  }
+}
+.lib-clear.armed {
+  color: #ff6b6b;
+  background: rgba(255, 107, 107, 0.14);
+}
+@media (hover: hover) {
+  .lib-clear.armed:hover {
+    color: #ff8585;
+    background: rgba(255, 107, 107, 0.22);
+  }
+}
+:root[data-cjk] .lib-clear {
   font-size: 14px;
   letter-spacing: 0.18em;
 }

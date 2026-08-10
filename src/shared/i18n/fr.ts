@@ -43,6 +43,8 @@ export const fr: Partial<Record<Key, string>> = {
   'lib.live': 'En direct',
   'lib.emptyPlaylists': 'Aucune liste enregistrée. Enregistrez-en une depuis le panneau de lecture.',
   'lib.emptyLive': 'Aucune source en direct enregistrée.',
+  'lib.clearRecents': 'Effacer',
+  'lib.clearConfirm': 'Tout effacer ?',
   'common.collapse': 'Réduire le panneau',
   'common.default': 'Par défaut',
 
@@ -157,6 +159,12 @@ export const fr: Partial<Record<Key, string>> = {
     'Emplacement des captures d’écran. Saisissez un chemin ou parcourez.',
   'set.shotDir.browse': 'Parcourir…',
 
+  'set.oscStyle.label': 'Style des contrôles',
+  'set.oscStyle.desc1':
+    'Flottant : une barre compacte au-dessus de l\'image, masquée après un moment d\'inactivité.',
+  'set.oscStyle.desc2':
+    'Ancré : sur toute la largeur, en bas de la fenêtre. En mode fenêtré, la vidéo lui laisse la place — elle ne masque donc jamais l\'image et ne disparaît pas.',
+
   'set.oscDelay.label': 'Délai de masquage automatique',
   'set.oscDelay.desc1':
     'Durée d’affichage des commandes à l’écran après l’arrêt du pointeur.',
@@ -172,6 +180,8 @@ export const fr: Partial<Record<Key, string>> = {
   'opt.deint.on': 'Toujours activé',
   'opt.deint.off': 'Désactivé',
   'opt.quality.best': 'Meilleure',
+  'opt.oscStyle.floating': 'Flottant',
+  'opt.oscStyle.docked': 'Ancré en bas',
   'opt.shot.png': 'PNG (sans perte)',
   'opt.shot.jpg': 'JPG (haute qualité)',
   'opt.subFont.system': 'Police système (sans-serif)',

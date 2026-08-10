@@ -43,6 +43,8 @@ export const de: Partial<Record<Key, string>> = {
   'lib.live': 'Live',
   'lib.emptyPlaylists': 'Noch keine Wiedergabelisten gespeichert. Speichere eine im Wiedergabelisten-Panel.',
   'lib.emptyLive': 'Noch keine Live-Quellen gespeichert.',
+  'lib.clearRecents': 'Leeren',
+  'lib.clearConfirm': 'Alle löschen?',
   'common.collapse': 'Panel einklappen',
   'common.default': 'Standard',
 
@@ -157,6 +159,12 @@ export const de: Partial<Record<Key, string>> = {
     'Wo Screenshots gespeichert werden. Pfad eingeben oder durchsuchen.',
   'set.shotDir.browse': 'Durchsuchen…',
 
+  'set.oscStyle.label': 'Steuerungsstil',
+  'set.oscStyle.desc1':
+    'Schwebend: eine kompakte Leiste über dem Bild, die nach kurzer Inaktivität ausgeblendet wird.',
+  'set.oscStyle.desc2':
+    'Angedockt: über die volle Breite am unteren Fensterrand. Im Fenstermodus macht das Video Platz dafür — es verdeckt das Bild also nie und blendet sich nicht aus.',
+
   'set.oscDelay.label': 'Verzögerung fürs Ausblenden',
   'set.oscDelay.desc1':
     'Wie lange die Bildschirmsteuerung sichtbar bleibt, nachdem der Zeiger stoppt.',
@@ -172,6 +180,8 @@ export const de: Partial<Record<Key, string>> = {
   'opt.deint.on': 'Immer an',
   'opt.deint.off': 'Aus',
   'opt.quality.best': 'Beste',
+  'opt.oscStyle.floating': 'Schwebend',
+  'opt.oscStyle.docked': 'Unten angedockt',
   'opt.shot.png': 'PNG (verlustfrei)',
   'opt.shot.jpg': 'JPG (hohe Qualität)',
   'opt.subFont.system': 'Systemstandard (sans-serif)',

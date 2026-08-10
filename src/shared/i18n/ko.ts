@@ -45,6 +45,8 @@ export const ko: Partial<Record<Key, string>> = {
   'lib.live': '라이브',
   'lib.emptyPlaylists': '저장된 재생목록이 없습니다. 재생목록 패널에서 저장하세요.',
   'lib.emptyLive': '저장된 라이브 소스가 없습니다.',
+  'lib.clearRecents': '지우기',
+  'lib.clearConfirm': '모두 지울까요?',
   'common.collapse': '패널 접기',
   'common.default': '기본값',
 
@@ -159,6 +161,12 @@ export const ko: Partial<Record<Key, string>> = {
     '스크린샷이 저장되는 위치. 경로를 입력하거나 찾아보세요.',
   'set.shotDir.browse': '찾아보기…',
 
+  'set.oscStyle.label': '컨트롤 표시 방식',
+  'set.oscStyle.desc1':
+    '플로팅: 화면 위에 떠 있는 작은 막대로, 잠시 조작이 없으면 숨겨집니다.',
+  'set.oscStyle.desc2':
+    '고정: 창 아래쪽에 전체 너비로 표시됩니다. 창 모드에서는 영상이 자리를 내주므로 화면을 가리지 않고, 숨겨지지도 않습니다.',
+
   'set.oscDelay.label': '자동 숨김 지연',
   'set.oscDelay.desc1':
     '포인터가 멈춘 후 화면 컨트롤이 계속 표시되는 시간.',
@@ -174,6 +182,8 @@ export const ko: Partial<Record<Key, string>> = {
   'opt.deint.on': '항상 켜기',
   'opt.deint.off': '끄기',
   'opt.quality.best': '최고',
+  'opt.oscStyle.floating': '플로팅',
+  'opt.oscStyle.docked': '아래쪽 고정',
   'opt.shot.png': 'PNG(무손실)',
   'opt.shot.jpg': 'JPG(고품질)',
   'opt.subFont.system': '시스템 기본(sans-serif)',

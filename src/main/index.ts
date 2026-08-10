@@ -101,6 +101,24 @@ const isMaxed = (): boolean => preMaxBounds != null
 let lastAspect = 0 // last video aspect the window was fitted to (avoid re-jumping)
 
 const OSC_H = 92
+// Docked style: the same-height bar, but full-bleed along the window's bottom edge.
+// Windowed it reserves that strip FROM the video (video-margin-ratio-bottom, the exact
+// mirror of what the title strip does at the top) so the controls never cover the
+// picture and never auto-hide. Fullscreen it keeps the shape but floats over the video.
+// Along the bottom edge, height is what the bar costs the picture — so the controls fold
+// into ONE row (see `.osc.docked` in styles.css) instead of the floating pill's two.
+// The transport glyphs keep their full size (they're the ones you aim at), so the row is
+// as tall as a 44px play button plus breathing room, still well under the pill's 92.
+const DOCK_H = 56
+/** Is the docked bar style selected? The mini player opts out — it has its own tiny
+ *  overlay and a full-width bar would dwarf it. */
+const isDocked = (): boolean => getSettings().oscStyle === 'docked' && !isMini()
+/** Docked AND owning a strip of its own — windowed only. This is what makes the bar
+ *  permanent: there is nothing to uncover by hiding it. */
+const dockPinned = (): boolean => isDocked() && !preFsBounds
+/** Height the docked bar takes away from the video area right now. 0 unless it is
+ *  actually pinned and something is playing (the Home screen shows no controls). */
+const dockReserve = (): number => (dockPinned() && hasMedia ? DOCK_H : 0)
 // Right panel is dynamic: PANEL_MAX_W when there's room, shrinking toward
 // PANEL_MIN_W on small windows so the OSC still gets ≥ OSC_MIN_W beside it.
 // The window's min width is derived from these so both always fit (panelW).
@@ -893,6 +911,7 @@ function goHome(): void {
   // ever cleared it — there was no way back to Home with a file loaded. Leaving it set
   // makes every mouse move on the Home screen pop the OSC back up.
   hasMedia = false
+  updateVideoMargin() // nothing playing → give the docked bar's reserved strip back
   if (hideTimer) {
     clearTimeout(hideTimer)
     hideTimer = null
@@ -1807,10 +1826,104 @@ function loadRenderer(w: BrowserWindow, query = ''): void {
   }
 }
 
+// windows that reported "React mounted" (see main.tsx → ui:renderer-ready)
+const rendererUp = new WeakSet<BrowserWindow>()
+
+/**
+ * Load a child window's page, run its setup once the UI is really up, and reload it if it
+ * isn't — because a half-loaded window used to stay broken until the app was restarted.
+ *
+ * The bug this fixes: on a cold `npm run dev` the OSC sometimes came up as a bare frosted
+ * pane — its strip correctly reserved from the video, nothing inside it — and was fine on
+ * the next launch. Two separate failures can cause that, and only the second one explains
+ * the observed case:
+ *
+ *  1. the document load fails outright (Vite not listening yet) → `did-fail-load`.
+ *  2. **the document loads but its module scripts don't.** createWindows() loads five
+ *     windows back to back; the first request makes Vite discover its dependencies and
+ *     re-optimise, and requests arriving during that window are answered with 504s. The
+ *     HTML is served fine, so `did-finish-load` fires and `did-fail-load` never does —
+ *     main believes the window is up while React never mounted. Meanwhile the reveal path
+ *     calls showInactive() regardless, so the empty frosted window is shown.
+ *
+ * Hence the handshake: the renderer pings us after ReactDOM.render, and a window that
+ * hasn't pinged within READY_TIMEOUT gets reloaded. Only dev can hit case 2 (production
+ * loads from file://), but the guard is cheap and harmless either way.
+ *
+ * `on`, not `once`: setup is idempotent, so it also re-runs after an HMR reload or a
+ * renderer crash — both of which used to leave the same half-dead window.
+ */
+const READY_TIMEOUT = 4000
+function loadRendererWithSetup(w: BrowserWindow, query: string, setup: () => void): void {
+  let tries = 0
+  let readyTimer: NodeJS.Timeout | null = null
+
+  const retry = (why: string): void => {
+    if (w.isDestroyed()) return
+    if (tries++ >= 5) {
+      console.error(`[lunoir] renderer never came up (${query || 'main'}): ${why}`)
+      return
+    }
+    loadRenderer(w, query)
+  }
+
+  // a fresh load means the previous ping is void — otherwise a window that mounted once
+  // and then reloaded into failing modules would keep its stale "up" flag and never retry
+  w.webContents.on('did-start-loading', () => rendererUp.delete(w))
+
+  w.webContents.on('did-finish-load', () => {
+    if (w.isDestroyed()) return
+    setup() // place/shape the window now; the content check is separate
+    // the document is up — give the module chain a moment to actually mount React
+    if (readyTimer) clearTimeout(readyTimer)
+    readyTimer = setTimeout(() => {
+      readyTimer = null
+      if (w.isDestroyed() || rendererUp.has(w)) return
+      retry('no ready ping (module scripts likely failed)')
+    }, READY_TIMEOUT)
+  })
+
+  w.webContents.on('did-fail-load', (_e, code, desc, _url, isMainFrame) => {
+    // -3 is ERR_ABORTED — a load we replaced on purpose, not a failure. Sub-frames
+    // don't carry our UI, so they can't be the cause of a blank window either.
+    if (!isMainFrame || code === -3 || w.isDestroyed()) return
+    setTimeout(() => retry(`${code} ${desc}`), 300)
+  })
+
+  loadRenderer(w, query)
+}
+
 function broadcast(channel: string, ...args: unknown[]): void {
   for (const w of [win, oscWin, rightPanelWin, leftPanelWin, menuWin, libraryWin]) {
     if (w && !w.isDestroyed()) w.webContents.send(channel, ...args)
   }
+}
+
+/** Broadcast to everything EXCEPT the OSC window. Used to auto-hide the rest of the UI
+ *  while the docked bar stays: the OSC's own `ui-hidden` class also turns off its
+ *  pointer events, so telling it to hide would leave a visible but dead bar. */
+function broadcastExceptOsc(channel: string, ...args: unknown[]): void {
+  for (const w of [win, rightPanelWin, leftPanelWin, menuWin, libraryWin]) {
+    if (w && !w.isDestroyed()) w.webContents.send(channel, ...args)
+  }
+}
+
+/**
+ * Put the UI away. The pinned docked bar is the exception: it sits in a strip the video
+ * has already given up, so hiding it uncovers nothing — just a black gap — and it would
+ * come back the instant the pointer moved anyway. Everything else still hides, whatever
+ * the trigger was (the auto-hide timer, the context menu, the 收藏 overlay).
+ *
+ * NOT for the paths that genuinely end the docked state — going Home and entering the
+ * mini player both hide the bar for real, and both call the plain pair directly.
+ */
+function hideUi(): void {
+  if (dockPinned() && hasMedia) {
+    broadcastExceptOsc('ui:hide')
+    return
+  }
+  broadcast('ui:hide')
+  animateOsc(false)
 }
 
 // Right-panel width for a given window width: full (PANEL_MAX_W) when there's
@@ -1827,13 +1940,24 @@ function pushPanelWidth(): void {
 }
 
 /** Resting bounds of the OSC: centered in the middle strip left free by whichever
- *  side panel is open (settings docks left, playlist docks right; only one open). */
+ *  side panel is open (settings docks left, playlist docks right; only one open).
+ *  Docked style instead runs the full free width, flush with the bottom edge. */
 function oscRestBounds(): Electron.Rectangle {
   const b = win!.getBounds()
   const pw = panelW(b.width)
   const left = leftPanelOpen ? pw : 0
   const right = panelOpen ? pw : 0
   const avail = b.width - left - right
+  if (isDocked()) {
+    // full-bleed: no side gap, no bottom margin, no centring. The panels still inset
+    // it, so the bar shortens between them exactly like the pill does.
+    return {
+      x: Math.round(b.x + left),
+      y: Math.round(b.y + b.height - DOCK_H),
+      width: Math.round(avail),
+      height: DOCK_H
+    }
+  }
   const w = Math.min(620, Math.max(OSC_MIN_W, avail - OSC_GAP))
   const margin = Math.max(44, Math.round(b.height * 0.09))
   return {
@@ -1891,13 +2015,22 @@ function animateOsc(reveal: boolean): void {
     oscAnim = null
   }
   const rest = oscRestBounds()
-  const lift = 22
+  // The floating pill rises into place from below. The docked bar can't: `rest.y` already
+  // sits flush with the window's bottom edge, so lifting from `rest.y + 22` starts it
+  // 22px off-screen — clipped by the screen edge, it appears to GROW to full height
+  // rather than slide, which reads as a zoom. A pinned bar has nowhere to rise from
+  // anyway, so it just fades in place.
+  const lift = isDocked() ? 0 : 22
   const dur = reveal ? 260 : 190
-  if (reveal && !oscWin.isVisible()) {
-    // show while fully transparent so the OS open-animation isn't seen
-    setWinOpacity(oscWin, 0)
+  // Coming from nothing on screen — either never shown, or pre-warmed and parked at 1x1
+  // (see oscSetup). Opacity, not isVisible(), is the test: a parked window IS "visible",
+  // and skipping this would animate the bar out of the parked 1x1 rect in the window's
+  // top-left corner. Snap it to its real geometry first, then animate.
+  if (reveal && (!oscWin.isVisible() || oscWin.getOpacity() === 0)) {
+    setWinOpacity(oscWin, 0) // show while fully transparent so the OS open-animation isn't seen
     oscWin.setBounds({ ...rest, y: rest.y + lift })
-    oscWin.showInactive()
+    oscWin.setIgnoreMouseEvents(false) // parked overlays are click-through; this one is live now
+    if (!oscWin.isVisible()) oscWin.showInactive()
   }
   oscShown = reveal
   const fromOp = oscWin.getOpacity()
@@ -1922,10 +2055,70 @@ function animateOsc(reveal: boolean): void {
   }, 16)
 }
 
+/**
+ * Everything the OSC window needs once its page is actually up: drop the Win11 hairline,
+ * shape its corners for the current style, place it, hand it its resize grips, reveal it.
+ * Runs on every successful load (see loadRendererWithSetup) — so a retried load or an HMR
+ * reload gets a fully set-up window too, not a frosted pane with nothing in it.
+ */
+function oscSetup(): void {
+  if (oscWin && !oscWin.isDestroyed()) {
+    removeBorderLine(oscWin)
+    // a full-bleed bar with rounded corners would show two notches of video at its top
+    // edge and two of nothing at the bottom — square it off when docked
+    setCornerPreference(oscWin, isDocked() ? CORNER_DONOTROUND : CORNER_DEFAULT)
+    // Pre-warm, exactly like the panels and the 收藏 overlay: show it once now, fully
+    // transparent and click-through, so Windows plays its window-open SCALE animation
+    // while nobody can see it. Every later reveal then finds an already-shown window and
+    // is a pure fade. Without this the first reveal — which happens in front of the user,
+    // when media loads — carried a visible zoom, glaring on a full-width bar.
+    if (!oscWin.isVisible()) {
+      setWinOpacity(oscWin, 0)
+      oscWin.setIgnoreMouseEvents(true)
+      oscWin.showInactive()
+      parkOverlay(oscWin) // warm, but not sitting over the video at full size
+    }
+  }
+  layoutOsc()
+  pushOscGrips(true) // the view just (re)mounted, so send it even if unchanged
+  revealUi()
+}
+
 /** Keep the OSC glued to the window when it moves/resizes. */
 function layoutOsc(): void {
   if (!win || !oscWin || win.isDestroyed() || oscWin.isDestroyed()) return
   if (oscShown && !oscAnim) oscWin.setBounds(oscRestBounds())
+  pushOscGrips()
+}
+
+// last edge set pushed to the OSC, so the liberal call sites below cost nothing
+let lastGrips = ''
+
+/**
+ * A frameless window's resize border is its own outermost pixels — and the docked bar
+ * is a separate child window sitting exactly on top of them, so the bottom edge and both
+ * bottom corners stop being draggable. Same bug the side panels had; same cure: hand the
+ * OSC a set of invisible grips that resize the MAIN window (ResizeGrips + win:set-bounds).
+ *
+ * Which edges it has to cover is a main-process question — it depends on the style, the
+ * fullscreen/maximized state, AND which side panel is open, since an open panel insets
+ * the bar so that side is interior (and the panel already carries its own grips there).
+ * Nothing to restore when floating: the pill rests well clear of the edges.
+ */
+function pushOscGrips(force = false): void {
+  if (!oscWin || oscWin.isDestroyed()) return
+  const edges: string[] = []
+  // no grips when resizing isn't possible anyway — win:set-bounds refuses while
+  // fullscreen or "maximized", and a resize cursor that does nothing is worse than none
+  if (isDocked() && !preFsBounds && !isMaxed()) {
+    edges.push('s')
+    if (!leftPanelOpen) edges.push('w', 'sw')
+    if (!panelOpen) edges.push('e', 'se')
+  }
+  const key = edges.join(',')
+  if (key === lastGrips && !force) return
+  lastGrips = key
+  oscWin.webContents.send('osc:grips', edges)
 }
 
 /**
@@ -1934,7 +2127,9 @@ function layoutOsc(): void {
  * panel's easeOutExpo feel (fast out, long settle). Skips when hidden.
  */
 function slideOscToRest(): void {
-  if (!oscWin || oscWin.isDestroyed() || !oscShown) return
+  if (!oscWin || oscWin.isDestroyed()) return
+  pushOscGrips() // a panel just opened/closed → that side of the bar changed hands
+  if (!oscShown) return
   const rest = oscRestBounds()
   const from = oscWin.getBounds()
   if (from.x === rest.x && from.y === rest.y && from.width === rest.width) return
@@ -1957,7 +2152,7 @@ function slideOscToRest(): void {
       x: Math.round(from.x + (rest.x - from.x) * e),
       y: Math.round(from.y + (rest.y - from.y) * e),
       width: Math.round(from.width + (rest.width - from.width) * e),
-      height: OSC_H
+      height: rest.height
     })
     if (p >= 1) {
       clearInterval(oscAnim!)
@@ -2187,8 +2382,7 @@ function toggleLibrary(): void {
     clearTimeout(hideTimer)
     hideTimer = null
   }
-  broadcast('ui:hide')
-  animateOsc(false)
+  hideUi()
   animateLibrary(true)
   broadcast('library:reveal', true) // library window (scale-in) + main window (cursor/Home on-state)
 }
@@ -2219,9 +2413,7 @@ function makeLibraryWindow(): BrowserWindow {
     show: false,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
   })
-  loadRenderer(lw, 'win=library')
-  lw.webContents.once('did-finish-load', () => {
-    if (lw.isDestroyed()) return
+  loadRendererWithSetup(lw, 'win=library', () => {
     removeBorderLine(lw)
     if (win && !win.isDestroyed()) {
       lw.setBounds(libraryBounds())
@@ -2294,9 +2486,12 @@ function revealUi(): void {
     }
     oscHovered = false
     if (trimClip >= 0 && getSettings().pinOscInTrim) return // keep the in/out handles reachable while trimming
-    broadcast('ui:hide')
+    if (dockPinned() && hasMedia) {
+      hideUi() // the bar stays; the rest of the UI goes
+      return
+    }
+    hideUi()
     nudgeCursor() // .ui-hidden just enabled cursor:none — make Chromium actually apply it
-    animateOsc(false) // slide down + fade out
   }, delayMs)
 }
 
@@ -2330,6 +2525,7 @@ function fakeMaximize(): void {
   preMaxBounds = win.getBounds()
   win.setBounds(screen.getDisplayMatching(preMaxBounds).workArea) // workArea = keeps the taskbar
   win.webContents.send('win:maximized', true)
+  pushOscGrips() // maximized → nothing to resize, drop the docked bar's grips
 }
 
 function unfakeMaximize(): void {
@@ -2338,6 +2534,7 @@ function unfakeMaximize(): void {
   preMaxBounds = null
   win.setBounds(restore)
   win.webContents.send('win:maximized', false)
+  pushOscGrips()
 }
 
 function toggleFullscreen(): void {
@@ -2369,6 +2566,7 @@ function toggleFullscreen(): void {
   syncFsTopmost() // topmost above the taskbar while fullscreen + frontmost (alt-tab releases)
   win.webContents.send('win:fullscreen', preFsBounds != null)
   updateVideoMargin() // 0 in fullscreen (video fills), restore the strip on exit
+  pushOscGrips() // fullscreen has no resizable edge to restore; windowed does
   // the window size just changed — snap the OSC to the new bottom-center and
   // cancel any in-flight reveal/hide so it doesn't settle at the old position
   const placeOsc = (): void => {
@@ -2509,14 +2707,38 @@ function updateVideoMargin(): void {
   // reserving space, so revealing it never reflows the picture.
   const ratio = noTitleStrip() || h <= 0 ? 0 : Math.min(0.4, TITLEBAR_H / h)
   mpv.setProperty('video-margin-ratio-top', ratio)
+  // The docked bar reserves its own strip the same way — and dockReserve() is 0 in
+  // every other mode, so the picture springs back to full height the moment the bar
+  // stops being pinned (fullscreen, mini, floating style, or back to Home).
+  mpv.setProperty('video-margin-ratio-bottom', h > 0 ? Math.min(0.4, dockReserve() / h) : 0)
 }
 
 /**
- * Resize the window so the *video area* (client minus the title strip) matches
- * the video's aspect ratio — picture fills it edge-to-edge, no letterbox bars in
- * windowed mode. Keeps the current width, stays centered, clamps to the display.
- * Skips when the ratio is unchanged (don't jump on same-ratio episodes) or when
- * fullscreen / maximized.
+ * Switching the control style grows/shrinks the WINDOW by the bar's height, so the
+ * picture keeps the size it had instead of losing a strip to the bar (Yao's call).
+ *
+ * Degrades honestly: when there's no room to grow — the window already fills the work
+ * area, or it's maximized / fullscreen / the mini player — the window stays put and the
+ * video gives up the strip instead (updateVideoMargin does that part regardless). Growing
+ * prefers to extend downward and only pulls the window up when it would cross the bottom
+ * of the work area, so the title bar can't get pushed off the top.
+ */
+function resizeForDock(delta: number): void {
+  if (!win || win.isDestroyed() || preFsBounds || isMaxed() || isMini()) return
+  const b = win.getBounds()
+  const area = screen.getDisplayMatching(b).workArea
+  const h = Math.min(b.height + delta, area.height)
+  if (h === b.height) return
+  const y = Math.min(b.y, Math.max(area.y, area.y + area.height - h))
+  win.setBounds({ x: b.x, y, width: b.width, height: h })
+}
+
+/**
+ * Resize the window so the *video area* (client minus the reserved chrome — the title
+ * strip, plus the docked control bar when it's pinned) matches the video's aspect ratio
+ * — picture fills it edge-to-edge, no letterbox bars in windowed mode. Keeps the current
+ * width, stays centered, clamps to the display. Skips when the ratio is unchanged (don't
+ * jump on same-ratio episodes) or when fullscreen / maximized.
  */
 function fitWindowToVideo(aspect: number): void {
   if (!win || win.isDestroyed()) return
@@ -2536,11 +2758,15 @@ function fitWindowToVideo(aspect: number): void {
   const maxW = Math.round(disp.width * 0.92)
   const maxH = Math.round(disp.height * 0.92)
 
+  // everything the window holds that ISN'T video. Miss the docked bar here and the
+  // "fit to the video's shape" ends up short by exactly the bar's height.
+  const chrome = TITLEBAR_H + dockReserve()
+
   let w = b.width
   let videoH = Math.round(w / aspect)
-  let h = videoH + TITLEBAR_H
-  if (h > maxH) { h = maxH; videoH = h - TITLEBAR_H; w = Math.round(videoH * aspect) }
-  if (w > maxW) { w = maxW; videoH = Math.round(w / aspect); h = videoH + TITLEBAR_H }
+  let h = videoH + chrome
+  if (h > maxH) { h = maxH; videoH = h - chrome; w = Math.round(videoH * aspect) }
+  if (w > maxW) { w = maxW; videoH = Math.round(w / aspect); h = videoH + chrome }
   w = Math.max(w, WIN_MIN_W)
   h = Math.max(h, 320)
 
@@ -2578,9 +2804,7 @@ function makePanelWindow(kind: 'playlist' | 'settings'): BrowserWindow {
     show: false,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
   })
-  loadRenderer(pw, `win=panel&kind=${kind}`)
-  pw.webContents.once('did-finish-load', () => {
-    if (pw.isDestroyed()) return
+  loadRendererWithSetup(pw, `win=panel&kind=${kind}`, () => {
     removeBorderLine(pw)
     setCornerPreference(pw, CORNER_DONOTROUND)
     // pre-warm: show it once now, fully transparent + click-through at its resting
@@ -2621,9 +2845,7 @@ function makeMenuWindow(): BrowserWindow {
     show: false,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
   })
-  loadRenderer(mw, 'win=menu')
-  mw.webContents.once('did-finish-load', () => {
-    if (mw.isDestroyed()) return
+  loadRendererWithSetup(mw, 'win=menu', () => {
     removeBorderLine(mw)
     // pre-warm like the panels so the first open doesn't play Windows' zoom-in
     setWinOpacity(mw, 0)
@@ -2741,7 +2963,13 @@ function createWindows(): void {
     title: 'Lunoir',
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
   })
-  loadRenderer(win)
+  // the main window needs the same guard: it's the FIRST load, so it's the one that
+  // triggers Vite's dependency optimisation, and if its own scripts lose that race the
+  // whole app is an empty frosted rectangle. (startMpv stays on ready-to-show — it must
+  // not re-run on a reload.)
+  loadRendererWithSetup(win, '', () => {
+    if (win && !win.isDestroyed()) removeBorderLine(win)
+  })
 
   oscWin = new BrowserWindow({
     width: 620,
@@ -2767,7 +2995,7 @@ function createWindows(): void {
     show: false,
     webPreferences: { preload: join(__dirname, '../preload/index.js'), sandbox: false }
   })
-  loadRenderer(oscWin, 'win=osc')
+  loadRendererWithSetup(oscWin, 'win=osc', oscSetup)
 
   // NOTE: we deliberately do NOT bounce focus back to the main window when the OSC
   // is clicked. Win11 renders an *inactive* window's acrylic as a flat fallback
@@ -2817,12 +3045,6 @@ function createWindows(): void {
     if (win) removeBorderLine(win) // drop the Win11 hairline border (visible in fullscreen)
     startMpv()
   })
-  oscWin.webContents.once('did-finish-load', () => {
-    if (oscWin) removeBorderLine(oscWin)
-    layoutOsc()
-    revealUi()
-  })
-
   // save volume / bounds / resume position while the window still exists
   // Aero Snap, Win+Up and a title-bar double-click can still reach the real OS
   // maximize, which is the thing that kills the acrylic for good. Bounce straight
@@ -3034,7 +3256,14 @@ function startMpv(): void {
 
   mpv = new MpvController(mpvPath)
   mpv.on('property', (name: string, data: unknown) => {
-    if ((name === 'path' || name === 'filename' || name === 'media-title') && data) hasMedia = true
+    if (name === 'path' || name === 'filename' || name === 'media-title') {
+      // flip only — the docked bar's reserved strip is gated on hasMedia, so the
+      // transition (not every title update) is what has to re-run the margin
+      if (data && !hasMedia) {
+        hasMedia = true
+        updateVideoMargin()
+      }
+    }
     broadcast('mpv:property', { name, data })
     // a new file loaded → drop stale probe + HDR badge, re-probe its tracks
     if (name === 'path' && typeof data === 'string') {
@@ -3244,7 +3473,8 @@ function registerIpc(): void {
     revealUi()
   })
   // context menu opened/closed — hide the OSC while it's up (the OSC is a separate
-  // child window on top of the main window, so it would otherwise cover the menu)
+  // child window on top of the main window, so it would otherwise cover the menu).
+  // The pinned docked bar is exempt — see hideUi().
   ipcMain.on('ui:menu-open', (_e, open: boolean) => {
     menuOpen = Boolean(open)
     if (menuOpen) {
@@ -3252,10 +3482,18 @@ function registerIpc(): void {
         clearTimeout(hideTimer)
         hideTimer = null
       }
-      broadcast('ui:hide')
-      animateOsc(false)
+      hideUi()
     }
   })
+
+  // "React mounted in this window" — the other half of the blank-window guard in
+  // loadRendererWithSetup. A window that loads its document but not its module scripts
+  // never sends this, and gets reloaded.
+  ipcMain.on('ui:renderer-ready', e => {
+    const w = BrowserWindow.fromWebContents(e.sender)
+    if (w) rendererUp.add(w)
+  })
+
   // Context menu, in its own acrylic window. The renderer measures its own content
   // (the accordion submenus change height), so we place + reveal only once a size
   // has arrived — that way the window never flashes at the wrong size.
@@ -3270,8 +3508,7 @@ function registerIpc(): void {
       clearTimeout(hideTimer)
       hideTimer = null
     }
-    broadcast('ui:hide')
-    animateOsc(false)
+    hideUi()
     broadcast('ui:menu', true) // main window keeps the pointer visible while we're up
     // the menu window is a dumb renderer: it draws these items and reports the size
     // it wants. Actions stay in the main window — it sends back only the item id.
@@ -3528,6 +3765,22 @@ function registerIpc(): void {
         libraryWin.setBounds(libraryBounds())
       }
       layoutOsc()
+    }
+    if (key === 'oscStyle') {
+      // grow/shrink the window by the bar's height so the picture keeps its size, then
+      // re-shape the OSC window itself (square corners full-bleed, rounded when it's a
+      // floating pill) and re-run the video margin for the new reserve.
+      const docked = value === 'docked'
+      resizeForDock(docked ? DOCK_H : -DOCK_H)
+      if (oscWin && !oscWin.isDestroyed()) {
+        setCornerPreference(oscWin, docked ? CORNER_DONOTROUND : CORNER_DEFAULT)
+      }
+      updateVideoMargin()
+      layoutOsc()
+      pushOscGrips(true) // the bar just took over / gave back the window's bottom edge
+      // re-arm: coming from docked the hide timer was never allowed to fire, and going
+      // to docked the bar may still be hidden from an earlier auto-hide
+      if (hasMedia) revealUi()
     }
     if (key === 'experimentalTimeline') {
       if (!value && mergeOn) toggleMerge() // turned off while merged → leave merge mode
