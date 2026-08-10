@@ -1,4 +1,4 @@
-// Downloads the Windows binaries MMPlayer bundles:
+// Downloads the Windows binaries Lunoir bundles:
 //   · mpv.exe        → resources/mpv/        (the playback core)
 //   · MediaInfo.exe  → resources/mediainfo/  (per-track metadata: bitrate + audio format)
 // Run with: npm run setup
@@ -21,7 +21,7 @@ function log(...a) { console.log(...a) }
 
 async function download(url, out) {
   log('→ Downloading', url)
-  const res = await fetch(url, { headers: { 'User-Agent': 'mmplayer-setup' } })
+  const res = await fetch(url, { headers: { 'User-Agent': 'lunoir-setup' } })
   if (!res.ok || !res.body) throw new Error(`Download failed ${res.status}`)
   await pipeline(Readable.fromWeb(res.body), createWriteStream(out))
 }
@@ -53,7 +53,7 @@ const MPV_RELEASES_API =
 async function findMpvAsset() {
   log('→ Querying latest mpv release...')
   const res = await fetch(MPV_RELEASES_API, {
-    headers: { 'User-Agent': 'mmplayer-setup', Accept: 'application/vnd.github+json' }
+    headers: { 'User-Agent': 'lunoir-setup', Accept: 'application/vnd.github+json' }
   })
   if (!res.ok) throw new Error(`GitHub API ${res.status}`)
   const releases = await res.json()
@@ -116,7 +116,7 @@ const MI_FALLBACK_VERSION = '26.05' // used if the GitHub API is unreachable
 async function findMediaInfoVersion() {
   try {
     const res = await fetch(MI_RELEASE_API, {
-      headers: { 'User-Agent': 'mmplayer-setup', Accept: 'application/vnd.github+json' }
+      headers: { 'User-Agent': 'lunoir-setup', Accept: 'application/vnd.github+json' }
     })
     if (res.ok) {
       const rel = await res.json()
