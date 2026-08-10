@@ -1,4 +1,4 @@
-# MMPlayer 方案与里程碑
+# Lunoir 方案与里程碑
 
 > 一款以 mpv 为内核、界面复刻 macOS 上 IINA 播放器的 Windows 媒体播放器。
 
