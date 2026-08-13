@@ -40,13 +40,15 @@ function fmtTc(frame: number, fps: number): string {
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2]
 
-// video-aspect-override values for the Aspect submenu. Stretch drops keepaspect.
-const ASPECTS: { key: string; label: string; apply: () => void }[] = [
-  { key: 'default', label: 'Default', apply: () => { window.mmp.set('keepaspect', true); window.mmp.set('video-aspect-override', -1) } },
-  { key: '16:9', label: '16:9', apply: () => { window.mmp.set('keepaspect', true); window.mmp.set('video-aspect-override', '16:9') } },
-  { key: '4:3', label: '4:3', apply: () => { window.mmp.set('keepaspect', true); window.mmp.set('video-aspect-override', '4:3') } },
-  { key: '2.35', label: '2.35:1', apply: () => { window.mmp.set('keepaspect', true); window.mmp.set('video-aspect-override', '2.35') } },
-  { key: 'stretch', label: 'Stretch to fill', apply: () => window.mmp.set('keepaspect', false) }
+// Aspect submenu. Picking a ratio centre-cuts the picture into that frame (main does
+// the maths — the crop is in pixels of the current file); Stretch is the one option
+// that really does distort.
+const ASPECTS: { key: string; label: string }[] = [
+  { key: 'default', label: 'Default' },
+  { key: '16:9', label: '16:9' },
+  { key: '4:3', label: '4:3' },
+  { key: '2.35', label: '2.35:1' },
+  { key: 'stretch', label: 'Stretch to fill' }
 ]
 
 // Main window: title bar, empty state, video-surface gestures, side panels. The
@@ -426,7 +428,7 @@ export default function OverlayView() {
         checked: aspect === a.key,
         onClick: () => {
           setAspect(a.key)
-          a.apply()
+          window.mmp.setAspect(a.key)
         }
       }))
     },

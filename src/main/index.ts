@@ -100,6 +100,20 @@ let preMaxBounds: Electron.Rectangle | null = null
 const isMaxed = (): boolean => preMaxBounds != null
 let lastAspect = 0 // last video aspect the window was fitted to (avoid re-jumping)
 
+// Aspect submenu. Picking a ratio CENTRE-CUTS the picture into that frame — 4:3 into
+// 16:9 loses top and bottom, 2.35 into 16:9 loses the sides — it never distorts.
+// (This used to set video-aspect-override, which re-declares the file's DAR and so
+// squeezes the picture to shape: the right tool for a mis-tagged DVD, the wrong one
+// for framing.) mpv's video-crop takes pixels of the CODED frame and centres the cut
+// when no offset is given, so the maths runs against video-params/w|h + the source
+// DAR — all three of which keep reporting their UNCROPPED values while a crop is
+// active, which is what stops each re-apply from cropping the crop.
+const ASPECT_TARGETS: Record<string, number> = { '16:9': 16 / 9, '4:3': 4 / 3, '2.35': 2.35 }
+let aspectPreset = 'default' // sticky across files, like MPC's video frame setting
+let srcAspect = 0 // video-params/aspect — the file's own ratio
+let srcW = 0 // video-params/w|h — coded size, what video-crop counts in
+let srcH = 0
+
 const OSC_H = 92
 // Docked style: the same-height bar, but full-bleed along the window's bottom edge.
 // Windowed it reserves that strip FROM the video (video-margin-ratio-bottom, the exact
@@ -2783,6 +2797,31 @@ function fitWindowToVideo(aspect: number): void {
   updateVideoMargin()
 }
 
+/**
+ * Apply the current aspect preset to whatever is playing. Safe to call as often as
+ * you like — it recomputes from the source's own numbers, so it's idempotent, and it
+ * has to be re-run per file because the crop is in pixels of THIS file's frame.
+ */
+function applyAspect(): void {
+  if (!mpv) return
+  mpv.setProperty('keepaspect', aspectPreset !== 'stretch')
+
+  const target = ASPECT_TARGETS[aspectPreset]
+  if (!target || !(srcAspect > 0) || srcW <= 0 || srcH <= 0) {
+    mpv.setProperty('video-crop', '') // Default / Stretch / audio-only → no cut
+  } else {
+    // keep the axis that already fits and cut the other one; giving no offset is
+    // what makes mpv centre the cut, so we deliberately pass a bare WxH
+    const w = target < srcAspect ? Math.round((srcW * target) / srcAspect) : srcW
+    const h = target > srcAspect ? Math.round((srcH * srcAspect) / target) : srcH
+    mpv.setProperty('video-crop', `${w}x${h}`)
+  }
+
+  // windowed: the window takes the shape the picture now has, or the cut would just
+  // buy black bars back on the other axis. Fullscreen/maximized this is a no-op.
+  fitWindowToVideo(target ?? srcAspect)
+}
+
 /** An acrylic side-panel child window (clone of the OSC), square-cornered since
  *  it docks to the window edge. Loaded with `?win=panel&kind=…`; shown on open. */
 function makePanelWindow(kind: 'playlist' | 'settings'): BrowserWindow {
@@ -3363,8 +3402,15 @@ function startMpv(): void {
     // (no auto-reveal on load: playback starts clean; the OSC appears on activity)
     // advance / repeat when the current item ends
     if (name === 'eof-reached' && data === true) onEnded()
-    // fit the window to the video's aspect ratio (no letterbox in windowed mode)
-    if (name === 'video-params/aspect' && typeof data === 'number') fitWindowToVideo(data)
+    // source geometry changed (new file, or mpv finally knows the size): re-cut to
+    // the chosen frame and fit the window. Null (audio-only) resets to 0 → no crop.
+    if (name === 'video-params/aspect' || name === 'video-params/w' || name === 'video-params/h') {
+      const v = typeof data === 'number' ? data : 0
+      if (name === 'video-params/aspect') srcAspect = v
+      else if (name === 'video-params/w') srcW = v
+      else srcH = v
+      applyAspect()
+    }
   })
   mpv.on('mpv-event', (event: string, msg?: { reason?: string }) => {
     broadcast('mpv:event', event)
@@ -3465,6 +3511,12 @@ function registerIpc(): void {
     }
   })
   ipcMain.on('mpv:set', (_e, name: string, value: unknown) => mpv?.setProperty(name, value))
+  // aspect preset lives here, not in the renderer: the crop is in pixels of the
+  // current file, so it has to be recomputed on every load (see applyAspect)
+  ipcMain.on('mpv:aspect', (_e, key: string) => {
+    aspectPreset = key
+    applyAspect()
+  })
   ipcMain.on('mpv:loadfile', (_e, path: string, userAgent?: string) =>
     openMedia(path, typeof userAgent === 'string' ? userAgent : '')
   )

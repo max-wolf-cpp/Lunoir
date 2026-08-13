@@ -174,6 +174,9 @@ const api = {
   // --- mpv control ---
   command: (cmd: any[]): Promise<any> => ipcRenderer.invoke('mpv:command', cmd),
   set: (name: string, value: unknown): void => ipcRenderer.send('mpv:set', name, value),
+  // aspect preset ('default' | '16:9' | '4:3' | '2.35' | 'stretch') — main owns it
+  // because the crop has to be recomputed per file
+  setAspect: (key: string): void => ipcRenderer.send('mpv:aspect', key),
   // userAgent: optional, from the URL box's Advanced strip — belongs to this source
   loadFile: (path: string, userAgent = ''): void =>
     ipcRenderer.send('mpv:loadfile', path, userAgent),
