@@ -98,7 +98,7 @@ export const ja: Partial<Record<Key, string>> = {
     '各ファイルの再生位置を覚え、再び開いたときにそこへ戻ります。',
   'set.resumePlaylist.label': 'プレイリストの位置を記憶',
   'set.resumePlaylist.desc':
-    'プレイリストのリンクを開き直すと、最後に見た動画へ戻ります。',
+    'プレイリストのファイルまたはリンクを開き直すと、最後に見た動画へ戻ります。',
 
   'set.keepPitch.label': '速度変更時にピッチを保つ',
   'set.keepPitch.desc':

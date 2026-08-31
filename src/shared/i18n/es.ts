@@ -96,7 +96,7 @@ export const es: Partial<Record<Key, string>> = {
     'Recordar la posición de cada archivo y volver a ella al reabrirlo.',
   'set.resumePlaylist.label': 'Reanudar listas de reproducción',
   'set.resumePlaylist.desc':
-    'Reabrir un enlace de lista vuelve al último vídeo visto en ella.',
+    'Reabrir un archivo o enlace de lista vuelve al último vídeo visto en ella.',
 
   'set.keepPitch.label': 'Mantener el tono al cambiar la velocidad',
   'set.keepPitch.desc':

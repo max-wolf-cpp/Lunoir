@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, Menu, screen, shell } from 'electron'
 import { join, dirname, basename, extname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { existsSync, readdirSync, readFileSync, writeFileSync, mkdirSync, statSync, renameSync, createWriteStream } from 'node:fs'
 import { spawn, ChildProcess } from 'node:child_process'
 import { pipeline } from 'node:stream/promises'
@@ -189,6 +190,7 @@ const VIDEO_EXT = [
   'mp4', 'mkv', 'avi', 'mov', 'flv', 'wmv', 'webm', 'm4v', 'ts', 'mpg', 'mpeg',
   'm2ts', 'rmvb', '3gp', 'ogv', 'mp3', 'flac', 'aac', 'wav', 'm4a', 'ogg', 'opus'
 ]
+const OPEN_EXT = [...VIDEO_EXT, 'm3u']
 const MAX_FOLDER_SCAN = 500 // cap a folder scan so a huge dir (e.g. a drive root) can't blow up the playlist
 
 // ---- Playlist ----
@@ -199,7 +201,7 @@ type RepeatMode = 'off' | 'all' | 'one'
 let playlist: string[] = []
 let plIndex = -1
 let urlTitles: Record<string, string> = {} // resolved titles for URL items (nice playlist names)
-let playlistKey = '' // stable id of the current URL playlist (for "resume at last item"); '' = none
+let playlistKey = '' // stable id of the current resumable playlist; '' = none
 let discDevice = '' // bluray-device / dvd-device path when the current item is a disc
 // the top-level thing the user just opened (for recents name-refinement); channel
 // switches within a loaded list don't change this
@@ -537,6 +539,12 @@ function playlistKeyOf(url: string): string {
   return 'list:' + (url.match(/[?&]list=([^&]+)/i)?.[1] ?? url)
 }
 
+/** Stable id for a local playlist. Its absolute path survives different cwd / launch methods. */
+function localPlaylistKey(path: string): string {
+  const full = resolve(path)
+  return 'file:' + (process.platform === 'win32' ? full.toLowerCase() : full)
+}
+
 /** Enumerate a playlist's entries (flat = fast, no per-video resolve): [{url,title}]. */
 function enumeratePlaylist(ytdlPath: string, url: string): Promise<{ url: string; title: string }[]> {
   return new Promise(resolve => {
@@ -651,6 +659,85 @@ function scanFolder(dir: string): string[] {
   } catch {
     return []
   }
+}
+
+type LocalPlaylistEntry = { path: string; title: string }
+
+/** Read a local M3U into Lunoir's own queue. Relative entries belong to the
+ *  playlist's directory, not the process cwd. Keeping this here (rather than
+ *  handing the file to mpv) is what lets us remember the selected item. */
+function parseLocalM3u(source: string): LocalPlaylistEntry[] {
+  const entries: LocalPlaylistEntry[] = []
+  const base = dirname(resolve(source))
+  let pendingTitle = ''
+  for (const raw of readFileSync(source, 'utf8').split(/\r?\n/)) {
+    const line = raw.trim().replace(/^\uFEFF/, '')
+    if (/^#EXTINF/i.test(line)) {
+      // The title follows the comma after the final quoted attribute. A comma
+      // inside an attribute value must not cut it short.
+      const q = line.lastIndexOf('"')
+      const c = line.indexOf(',', q >= 0 ? q : 0)
+      pendingTitle = c >= 0 ? line.slice(c + 1).trim() : ''
+      continue
+    }
+    if (!line || line.startsWith('#')) continue
+    let target = line
+    if (
+      target.length >= 2 &&
+      ((target.startsWith('"') && target.endsWith('"')) ||
+        (target.startsWith("'") && target.endsWith("'")))
+    ) {
+      target = target.slice(1, -1)
+    }
+    if (/^file:\/\//i.test(target)) {
+      try {
+        target = fileURLToPath(target)
+      } catch {
+        pendingTitle = ''
+        continue
+      }
+    } else if (!isUrl(target)) {
+      target = resolve(base, target)
+    }
+    entries.push({ path: target, title: pendingTitle || basename(target) })
+    pendingTitle = ''
+  }
+  return entries
+}
+
+/** Load a local media M3U as a resumable queue. A local M3U containing only
+ *  HTTP entries remains an IPTV channel list and follows the existing path. */
+function loadLocalPlaylist(source: string): void {
+  let entries: LocalPlaylistEntry[]
+  try {
+    entries = parseLocalM3u(source)
+  } catch {
+    broadcast('ui:toast', tr('main.playlistFailed'))
+    return
+  }
+  if (!entries.length) {
+    broadcast('ui:toast', tr('main.playlistFailed'))
+    return
+  }
+  if (entries.every(entry => /^https?:\/\//i.test(entry.path))) {
+    void loadChannelList(source) // a local IPTV list, not a series / media queue
+    return
+  }
+  playlist = entries.map(entry => entry.path)
+  urlTitles = {}
+  for (const entry of entries) urlTitles[entry.path] = entry.title
+  curOpenChannels = null
+  sourceType = 'queue'
+  playlistKey = localPlaylistKey(source)
+  discDevice = ''
+  plIndex = 0
+  if (getSettings().resumePlaylistItem) {
+    const last = getPlaylistItem(playlistKey)
+    const at = last ? playlist.indexOf(last) : -1
+    if (at >= 0) plIndex = at
+  }
+  resyncShuffle()
+  playCurrent()
 }
 
 // A browser-ish User-Agent — IPTV list servers commonly stub or refuse requests
@@ -847,8 +934,9 @@ function saveCollection(): void {
   }
 }
 
-/** Put a fresh set of channels/items into the queue and play at startIndex. */
-function playFavCollection(fav: FavEntry, channels: Channel[], startIndex: number): void {
+/** Put a fresh saved collection into the queue. A clicked child supplies an
+ *  explicit start index; opening the playlist row restores its last item. */
+function playFavCollection(fav: FavEntry, channels: Channel[], startIndex?: number): void {
   playlist = channels.map(c => c.url)
   urlTitles = {}
   for (const c of channels) urlTitles[c.url] = c.name
@@ -856,8 +944,14 @@ function playFavCollection(fav: FavEntry, channels: Channel[], startIndex: numbe
   sourceType = fav.kind === 'list' ? 'iptv' : 'queue'
   curOpen = { target: fav.target, kind: fav.kind } // so collection-saved reads true
   curRecentPending = false
-  plIndex = Math.max(0, Math.min(startIndex, playlist.length - 1))
-  playlistKey = ''
+  playlistKey = fav.kind === 'playlist' ? fav.target : ''
+  let index = startIndex ?? 0
+  if (startIndex == null && playlistKey && getSettings().resumePlaylistItem) {
+    const last = getPlaylistItem(playlistKey)
+    const at = last ? playlist.indexOf(last) : -1
+    if (at >= 0) index = at
+  }
+  plIndex = Math.max(0, Math.min(index, playlist.length - 1))
   discDevice = ''
   resyncShuffle()
   playCurrent()
@@ -867,7 +961,7 @@ function playFavCollection(fav: FavEntry, channels: Channel[], startIndex: numbe
  *  latest channels (a URL source updates; a local file picks up edits), falling back
  *  to the stored snapshot if the source is offline/gone. A saved playlist just plays
  *  its snapshot items (they're local/VOD files, not a live directory). */
-function loadFavCollection(fav: FavEntry, startIndex = 0): void {
+function loadFavCollection(fav: FavEntry, startIndex?: number): void {
   sourceUa = fav.userAgent ?? '' // restore (or clear) the source's UA before anything fetches
   if (fav.kind === 'playlist' && fav.items?.length) {
     playFavCollection(fav, fav.items.map(i => ({ url: i.path, name: i.name, group: '' })), startIndex)
@@ -1141,6 +1235,10 @@ function openMedia(target: string, userAgent = ''): void {
     loadPlaylistUrl(target) // async: enumerate the entries, then queue + play them
     return
   }
+  if (!isUrl(target) && /\.m3u$/i.test(target)) {
+    loadLocalPlaylist(target)
+    return
+  }
   // an IPTV channel list (.m3u / .txt — NOT .m3u8, which is a stream manifest)
   if (CHANNEL_LIST_EXT.test(target)) {
     loadChannelList(target)
@@ -1214,7 +1312,7 @@ function playCurrent(): void {
   }
   if (skipped > 0) broadcast('ui:toast', tr('main.skippedMissing'))
   const target = playlist[plIndex]
-  // remember which item of this URL playlist we're on, so reopening resumes here
+  // remember which item of this resumable playlist we're on, so reopening resumes here
   if (playlistKey && getSettings().resumePlaylistItem) savePlaylistItem(playlistKey, target)
   broadcast('playlist:changed', playlistPayload())
   broadcast('library:collection-saved', collectionSaved()) // panel save-button state
@@ -3816,7 +3914,7 @@ function registerIpc(): void {
     const fav = getFavourites().find(f => f.target === target)
     if (!fav) return
     closeLibrary()
-    loadFavCollection(fav, typeof index === 'number' ? index : 0)
+    loadFavCollection(fav, typeof index === 'number' ? index : undefined)
   })
   ipcMain.on('library:fav-item-remove', (_e, target: string, path: string) => {
     removeFavouriteItem(target, path)
@@ -3865,7 +3963,7 @@ function registerIpc(): void {
       title: tr('dlg.openMedia'),
       properties: ['openFile'],
       filters: [
-        { name: tr('dlg.filter.media'), extensions: VIDEO_EXT },
+        { name: tr('dlg.filter.media'), extensions: OPEN_EXT },
         { name: tr('dlg.filter.allFiles'), extensions: ['*'] }
       ]
     })
@@ -4074,9 +4172,9 @@ function buildMenu(): void {
           click: async () => {
             const res = await dialog.showOpenDialog(win!, {
               properties: ['openFile'],
-              filters: [{ name: tr('dlg.filter.media'), extensions: VIDEO_EXT }, { name: tr('dlg.filter.allFiles'), extensions: ['*'] }]
+              filters: [{ name: tr('dlg.filter.media'), extensions: OPEN_EXT }, { name: tr('dlg.filter.allFiles'), extensions: ['*'] }]
             })
-            if (!res.canceled && res.filePaths[0]) mpv?.loadFile(res.filePaths[0])
+            if (!res.canceled && res.filePaths[0]) openMedia(res.filePaths[0])
           }
         },
         {
