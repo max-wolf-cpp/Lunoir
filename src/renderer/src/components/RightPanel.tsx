@@ -923,7 +923,7 @@ export default function RightPanel({ open, onClose }: { open: boolean; onClose: 
                 <div
                   key={`a${tk.id}`}
                   className={`pl-item ${tk.id === aid ? 'active' : ''}`}
-                  onClick={() => window.mmp.set('aid', tk.id)}
+                  onClick={() => window.mmp.selectAudio(tk.id)}
                 >
                   <span className="pl-mark">{tk.id === aid ? <Check /> : null}</span>
                   <span className="pl-name" onMouseEnter={e => clipTitle(e.currentTarget)}>
