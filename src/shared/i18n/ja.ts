@@ -227,6 +227,7 @@ export const ja: Partial<Record<Key, string>> = {
   'panel.sec.subtitles': '字幕',
   'panel.empty.audio': '音声トラックなし',
   'panel.subNone': 'なし',
+  'panel.addAudio': '音声を追加…',
   'panel.addSub': '字幕を追加…',
   'panel.trackN': 'トラック {n}',
 
@@ -286,6 +287,7 @@ export const ja: Partial<Record<Key, string>> = {
     'フォルダーに {count} 本の動画 — 先頭 {max} 本を読み込みます',
   'main.resumed': '{time} から再開しました',
   'dlg.selectFolder': 'フォルダーを選択（動画フォルダー、または Blu-ray/DVD ディスク）',
+  'dlg.addAudio': '音声を追加',
   'dlg.addSubtitle': '字幕を追加',
   'dlg.addToPlaylist': 'プレイリストに追加',
   'dlg.openMedia': 'メディアを開く',

@@ -225,6 +225,7 @@ export const de: Partial<Record<Key, string>> = {
   'panel.sec.subtitles': 'Untertitel',
   'panel.empty.audio': 'Keine Audiospuren',
   'panel.subNone': 'Keine',
+  'panel.addAudio': 'Audiospur hinzufügen…',
   'panel.addSub': 'Untertitel hinzufügen…',
   'panel.trackN': 'Spur {n}',
 
@@ -284,6 +285,7 @@ export const de: Partial<Record<Key, string>> = {
     'Der Ordner enthält {count} Videos — die ersten {max} werden geladen',
   'main.resumed': 'Fortgesetzt ab {time}',
   'dlg.selectFolder': 'Ordner wählen (Video-Ordner oder Blu-ray/DVD-Disc)',
+  'dlg.addAudio': 'Audiospur hinzufügen',
   'dlg.addSubtitle': 'Untertitel hinzufügen',
   'dlg.addToPlaylist': 'Zur Wiedergabeliste hinzufügen',
   'dlg.openMedia': 'Medium öffnen',

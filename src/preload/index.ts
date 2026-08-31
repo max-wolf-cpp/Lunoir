@@ -273,6 +273,7 @@ const api = {
   removePlaylistItems: (indices: number[]): void => ipcRenderer.send('playlist:remove-multi', indices),
   addToPlaylist: (): void => ipcRenderer.send('playlist:add'),
   cycleRepeat: (): void => ipcRenderer.send('playlist:repeat-cycle'),
+  addAudio: (): void => ipcRenderer.send('audio:add'),
   addSubtitle: (): void => ipcRenderer.send('sub:add'),
   onPlaylistChanged: (cb: (p: Playlist) => void): Unsubscribe =>
     subscribe('playlist:changed', (p: Playlist) => cb(p)),

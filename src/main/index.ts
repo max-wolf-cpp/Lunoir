@@ -3636,6 +3636,31 @@ function registerIpc(): void {
   ipcMain.on('playlist:move', (_e, indices: number[], to: number) => movePlaylistItems(indices, to))
   ipcMain.on('playlist:remove-multi', (_e, indices: number[]) => removePlaylistItems(indices))
   ipcMain.on('playlist:repeat-cycle', () => cycleRepeat())
+  ipcMain.on('audio:add', async () => {
+    const res = await dialog.showOpenDialog(win!, {
+      title: tr('dlg.addAudio'),
+      properties: ['openFile'],
+      filters: [
+        {
+          name: tr('panel.sec.audio'),
+          extensions: [
+            'aac', 'ac3', 'dts', 'eac3', 'flac', 'm4a', 'mka', 'mp2', 'mp3',
+            'ogg', 'opus', 'thd', 'truehd', 'wav', 'w64', 'wv'
+          ]
+        },
+        { name: tr('dlg.filter.allFiles'), extensions: ['*'] }
+      ]
+    })
+    if (!res.canceled && res.filePaths[0]) {
+      try {
+        // mpv aligns an external track to the current playback timeline, so adding
+        // it halfway through a video starts it at the matching position.
+        await mpv?.command(['audio-add', res.filePaths[0], 'select'])
+      } catch {
+        /* ignore */
+      }
+    }
+  })
   ipcMain.on('sub:add', async () => {
     const res = await dialog.showOpenDialog(win!, {
       title: tr('dlg.addSubtitle'),

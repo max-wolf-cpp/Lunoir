@@ -227,6 +227,7 @@ export const ko: Partial<Record<Key, string>> = {
   'panel.sec.subtitles': '자막',
   'panel.empty.audio': '오디오 트랙 없음',
   'panel.subNone': '없음',
+  'panel.addAudio': '오디오 추가…',
   'panel.addSub': '자막 추가…',
   'panel.trackN': '트랙 {n}',
 
@@ -286,6 +287,7 @@ export const ko: Partial<Record<Key, string>> = {
     '폴더에 동영상 {count}개 — 처음 {max}개를 로드합니다',
   'main.resumed': '{time}부터 이어서 재생',
   'dlg.selectFolder': '폴더 선택(동영상 폴더 또는 Blu-ray/DVD 디스크)',
+  'dlg.addAudio': '오디오 추가',
   'dlg.addSubtitle': '자막 추가',
   'dlg.addToPlaylist': '재생목록에 추가',
   'dlg.openMedia': '미디어 열기',

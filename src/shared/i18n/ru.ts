@@ -226,6 +226,7 @@ export const ru: Partial<Record<Key, string>> = {
   'panel.sec.subtitles': 'Субтитры',
   'panel.empty.audio': 'Нет аудиодорожек',
   'panel.subNone': 'Нет',
+  'panel.addAudio': 'Добавить аудиодорожку…',
   'panel.addSub': 'Добавить субтитры…',
   'panel.trackN': 'Дорожка {n}',
 
@@ -285,6 +286,7 @@ export const ru: Partial<Record<Key, string>> = {
     'В папке {count} видео — загружаются первые {max}',
   'main.resumed': 'Продолжено с {time}',
   'dlg.selectFolder': 'Выберите папку (папку с видео или диск Blu-ray/DVD)',
+  'dlg.addAudio': 'Добавить аудиодорожку',
   'dlg.addSubtitle': 'Добавить субтитры',
   'dlg.addToPlaylist': 'Добавить в плейлист',
   'dlg.openMedia': 'Открыть медиа',
