@@ -2,6 +2,63 @@
 
 > 每到相对重要的节点更新此文档。方案见 [PLAN.md](PLAN.md)。
 
+## 当前状态（2026-09-02 · v0.9.2 发布 · 放大查看 + 文件信息浮层 + 外挂音轨）
+
+**阶段：两个用户痛点功能落地，加上社区 PR 合并。类型 / 构建 / i18n 全绿，Yao 实测通过。**
+
+### ① Ctrl+滚轮放大查看（zoom/pan viewer）
+
+Yao 的需求：「想放大画面观察画面细节」。
+
+用 mpv 已有的 `video-zoom` / `video-pan-x` / `video-pan-y` 属性实现，零额外依赖。
+
+| 手势 | 行为 |
+| --- | --- |
+| Ctrl+滚轮 | 缩放 25%–800%（log₂ 空间每格 ≈7%），右上角 OSD 显示百分比 |
+| 左键拖拽（已放大时）| 平移画面；拖拽期间**暂停**以保证跟手，松手自动恢复播放 |
+| Ctrl+双击 | 一键重置到 1×，pan 也归零 |
+| 换文件 | 自动重置，下一个文件始终从 1× 开始 |
+
+**普通滚轮继续调音量**，Ctrl 是分层的，和浏览器 / Photoshop 肌肉记忆一致。
+
+**pan 的延迟问题经过两轮排查：**
+1. 第一轮：rAF throttle（每帧最多一次 IPC），改善有限。
+2. 第二轮：pointermove 的 `stopPropagation` 没加，事件冒泡到 `onMouseMove` 触发一堆 UI 可见性逻辑，和 IPC 同时竞争。加了 `stopPropagation` 后仍有卡顿。
+3. 根本解法：**拖拽期间暂停**——mpv 渲染压力降下来，pan 立刻跟手。Yao 自己说「拖几下他暂停了就不卡了」，顺势变成设计。
+
+暂停后 `onClick` 触发 `togglePause` 又把播放恢复翻转一次——用 `panJustEnded` 标志跳过那次 click 解决。
+
+### ② 文件信息浮层（i 键）
+
+Yao 的需求：「想有个界面可以显示文件的具体信息 如分辨率 编码 码率 颜色啥的」。
+
+做成浮层（不混进右面板），按 `i` 键开关，点背景也能关。
+
+**数据来源：** `runProbe()` 原本就跑 MediaInfo，`parseMediaInfo()` 扩展后额外采集：
+- `General` track：容器格式、时长、**文件大小**、**整体码率**
+- `Video` track：编码、分辨率、帧率、视频码率、色深、色彩空间、HDR 类型
+- 所有 `Audio` track：商业名（TrueHD Atmos / DTS-HD MA…）、声道布局（5.1 / 7.1）、每轨码率
+
+结果以 `video:info` 广播给 renderer，`VideoInfo` 接口加进 preload。
+
+**磨砂问题：** CSS `backdrop-filter` 无法模糊 mpv 层（同标题栏 / URL 输入框的架构约束）。浮层背景用 `rgba(26, 26, 30, 0.92)` ——够厚能读，又不像 `0.97` 那么实，和整体风格统一。
+
+**声道写法：** MediaInfo 给的是整数总数（6、8），`formatChannels()` 映射成环绕声标签（5.1、7.1）。
+
+### ③ 外挂音轨加载（社区 PR #1，max-wolf-cpp）
+
+合并自 [zhbj420/Lunoir#1](https://github.com/zhbj420/Lunoir/pull/1)。
+
+- 右侧面板「音频」区新增「添加音轨…」按钮，支持 .flac / .dts / .truehd / .ac3 等格式。
+- 所选音轨（内嵌或外挂）以 `ff-index` 为键存入 `audio-selections.json`，下次打开同文件自动还原，在 resume seek 之前生效。
+
+### 发布说明
+
+- 全部 9 个语言包补了 `info.*` 新 key（`info.overallBitRate`、`info.fileSize` 等）。
+- fr.ts 历史遗留 bug：法语缩写的 U+2019 弯引号散布全文，esbuild 清缓存后全部暴露（和本次功能无关）。用 PowerShell 替换 UTF-8 字节 `E2 80 99` 为转义直引号修复，**此后 locale 文件里禁止用 Unicode 弯引号**。
+
+---
+
 ## 当前状态（2026-08-13 · v0.9.1 发布 · 画面比例改成「裁进画框」）
 
 **阶段：修掉右键菜单切比例会把画面拉变形的问题。类型 / 构建全绿,Yao 实测通过。**
