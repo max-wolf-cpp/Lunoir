@@ -291,6 +291,7 @@ export const en = {
   'panel.sec.subtitles': 'Subtitles',
   'panel.empty.audio': 'No audio tracks',
   'panel.subNone': 'None',
+  'panel.addAudio': 'Add audio…',
   'panel.addSub': 'Add subtitle…',
   'panel.trackN': 'Track {n}',
 
@@ -359,6 +360,7 @@ export const en = {
   'main.folderTruncated': 'Folder has {count} videos — loading the first {max}',
   'main.resumed': 'Resumed from {time}',
   'dlg.selectFolder': 'Select a folder (a video folder, or a Blu-ray/DVD disc)',
+  'dlg.addAudio': 'Add Audio',
   'dlg.addSubtitle': 'Add Subtitle',
   'dlg.addToPlaylist': 'Add to Playlist',
   'dlg.openMedia': 'Open Media',

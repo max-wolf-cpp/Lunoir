@@ -923,7 +923,7 @@ export default function RightPanel({ open, onClose }: { open: boolean; onClose: 
                 <div
                   key={`a${tk.id}`}
                   className={`pl-item ${tk.id === aid ? 'active' : ''}`}
-                  onClick={() => window.mmp.set('aid', tk.id)}
+                  onClick={() => window.mmp.selectAudio(tk.id)}
                 >
                   <span className="pl-mark">{tk.id === aid ? <Check /> : null}</span>
                   <span className="pl-name" onMouseEnter={e => clipTitle(e.currentTarget)}>
@@ -932,6 +932,12 @@ export default function RightPanel({ open, onClose }: { open: boolean; onClose: 
                 </div>
               ))
             )}
+            <button className="track-add" onClick={() => window.mmp.addAudio()}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              {t('panel.addAudio')}
+            </button>
             <AdjustRow
               label={t('adjust.delay')}
               variant="step"

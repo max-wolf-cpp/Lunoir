@@ -225,6 +225,7 @@ export const fr: Partial<Record<Key, string>> = {
   'panel.sec.subtitles': 'Sous-titres',
   'panel.empty.audio': 'Aucune piste audio',
   'panel.subNone': 'Aucun',
+  'panel.addAudio': 'Ajouter une piste audio…',
   'panel.addSub': 'Ajouter un sous-titre…',
   'panel.trackN': 'Piste {n}',
 
@@ -284,6 +285,7 @@ export const fr: Partial<Record<Key, string>> = {
     'Le dossier contient {count} vidéos — chargement des {max} premières',
   'main.resumed': 'Repris à {time}',
   'dlg.selectFolder': 'Sélectionner un dossier (dossier vidéo, ou disque Blu-ray/DVD)',
+  'dlg.addAudio': 'Ajouter une piste audio',
   'dlg.addSubtitle': 'Ajouter un sous-titre',
   'dlg.addToPlaylist': 'Ajouter à la liste de lecture',
   'dlg.openMedia': 'Ouvrir un média',

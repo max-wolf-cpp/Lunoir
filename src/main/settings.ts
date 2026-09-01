@@ -136,6 +136,51 @@ export function clearPosition(path: string): void {
   writePositions()
 }
 
+// ---- per-file selected audio track ----
+// Kept apart from resume positions: reaching the end clears a position, but must
+// not forget which embedded/external track the viewer chose for that file.
+export type AudioSelection =
+  | { type: 'embedded'; id: number }
+  | { type: 'external'; path: string }
+
+type AudioSelections = Record<string, AudioSelection>
+let audioCache: AudioSelections | null = null
+const audioFile = (): string => join(app.getPath('userData'), 'audio-selections.json')
+
+function audioSelections(): AudioSelections {
+  if (audioCache) return audioCache
+  try {
+    const parsed = JSON.parse(readFileSync(audioFile(), 'utf8')) as Record<string, unknown>
+    audioCache = Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, AudioSelection] => {
+        const value = entry[1]
+        if (!value || typeof value !== 'object') return false
+        const selection = value as Record<string, unknown>
+        return (
+          (selection.type === 'embedded' && typeof selection.id === 'number') ||
+          (selection.type === 'external' && typeof selection.path === 'string')
+        )
+      })
+    )
+  } catch {
+    audioCache = {}
+  }
+  return audioCache!
+}
+
+export function getAudioSelection(path: string): AudioSelection | undefined {
+  return audioSelections()[path]
+}
+
+export function saveAudioSelection(path: string, selection: AudioSelection): void {
+  audioSelections()[path] = selection
+  try {
+    writeFileSync(audioFile(), JSON.stringify(audioSelections()))
+  } catch {
+    /* ignore */
+  }
+}
+
 // ---- per-playlist "last item" (which video in a URL playlist you got to) ----
 // Keyed by a stable playlist id (e.g. YouTube's list=…), value = that item's URL.
 // Combined with the per-file positions above, reopening a playlist resumes both

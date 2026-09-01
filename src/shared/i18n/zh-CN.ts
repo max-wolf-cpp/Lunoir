@@ -221,6 +221,7 @@ export const zhCN: Partial<Record<Key, string>> = {
   'panel.sec.subtitles': '字幕',
   'panel.empty.audio': '无音轨',
   'panel.subNone': '无',
+  'panel.addAudio': '添加音轨…',
   'panel.addSub': '添加字幕…',
   'panel.trackN': '轨道 {n}',
 
@@ -283,6 +284,7 @@ export const zhCN: Partial<Record<Key, string>> = {
   'main.folderTruncated': '文件夹内有 {count} 个视频 — 仅加载前 {max} 个',
   'main.resumed': '已从 {time} 继续播放',
   'dlg.selectFolder': '选择文件夹（视频文件夹，或蓝光 / DVD 原盘）',
+  'dlg.addAudio': '添加音轨',
   'dlg.addSubtitle': '添加字幕',
   'dlg.addToPlaylist': '添加到播放列表',
   'dlg.openMedia': '打开媒体',

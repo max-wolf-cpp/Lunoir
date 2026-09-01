@@ -12,6 +12,8 @@ import {
   getPosition,
   savePosition,
   clearPosition,
+  getAudioSelection,
+  saveAudioSelection,
   getPlaylistItem,
   savePlaylistItem,
   addRecent,
@@ -3443,6 +3445,15 @@ function startMpv(): void {
       pendingResumeToast = '' // clear any stale pending toast from a failed load
       loadedTarget = playlist[plIndex] || ''
       flushPendingSubs(loadedTarget) // Emby's sidecar subs, if the lookup beat the load
+      // Restore the viewer's per-file audio choice before seeking. An external
+      // track joins mpv's current timeline, so the following resume seek moves
+      // picture and both audio kinds to the same saved position.
+      const audio = resumePath ? getAudioSelection(resumePath) : undefined
+      if (audio?.type === 'embedded') {
+        mpv?.setProperty('aid', audio.id)
+      } else if (audio?.type === 'external' && existsSync(audio.path)) {
+        mpv?.command(['audio-add', audio.path, 'select']).catch(() => {})
+      }
       if (getSettings().resumePlayback && resumePath && canResume()) {
         const pos = getPosition(resumePath)
         if (typeof pos === 'number' && pos > 5) {
@@ -3636,6 +3647,46 @@ function registerIpc(): void {
   ipcMain.on('playlist:move', (_e, indices: number[], to: number) => movePlaylistItems(indices, to))
   ipcMain.on('playlist:remove-multi', (_e, indices: number[]) => removePlaylistItems(indices))
   ipcMain.on('playlist:repeat-cycle', () => cycleRepeat())
+  ipcMain.on('audio:select', (_e, id: number) => {
+    if (!Number.isInteger(id)) return
+    mpv?.setProperty('aid', id)
+    if (!resumePath) return
+    const track = lastTracks.find(t => t.type === 'audio' && t.id === id)
+    const externalPath = track?.['external-filename']
+    if (track?.external === true && typeof externalPath === 'string' && externalPath) {
+      saveAudioSelection(resumePath, { type: 'external', path: externalPath })
+    } else {
+      saveAudioSelection(resumePath, { type: 'embedded', id })
+    }
+  })
+  ipcMain.on('audio:add', async () => {
+    const res = await dialog.showOpenDialog(win!, {
+      title: tr('dlg.addAudio'),
+      properties: ['openFile'],
+      filters: [
+        {
+          name: tr('panel.sec.audio'),
+          extensions: [
+            'aac', 'ac3', 'dts', 'eac3', 'flac', 'm4a', 'mka', 'mp2', 'mp3',
+            'ogg', 'opus', 'thd', 'truehd', 'wav', 'w64', 'wv'
+          ]
+        },
+        { name: tr('dlg.filter.allFiles'), extensions: ['*'] }
+      ]
+    })
+    if (!res.canceled && res.filePaths[0]) {
+      try {
+        // mpv aligns an external track to the current playback timeline, so adding
+        // it halfway through a video starts it at the matching position.
+        await mpv?.command(['audio-add', res.filePaths[0], 'select'])
+        if (resumePath) {
+          saveAudioSelection(resumePath, { type: 'external', path: res.filePaths[0] })
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+  })
   ipcMain.on('sub:add', async () => {
     const res = await dialog.showOpenDialog(win!, {
       title: tr('dlg.addSubtitle'),
