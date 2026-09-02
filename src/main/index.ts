@@ -319,9 +319,22 @@ async function downloadYtdl(): Promise<string | null> {
     if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`)
     const tmp = `${dest}.part` // write to temp then rename so a partial file can't be used
     await pipeline(Readable.fromWeb(res.body as never), createWriteStream(tmp))
-    renameSync(tmp, dest)
+    // Windows Defender may hold the just-written .part file open briefly while scanning.
+    // Retry the rename with increasing delays (0, 500ms, 1s, 2s, 4s) to wait it out.
+    let lastRenameErr: unknown
+    for (let i = 0; i < 5; i++) {
+      if (i > 0) await new Promise(r => setTimeout(r, 500 * i))
+      try {
+        try { unlinkSync(dest) } catch {}
+        renameSync(tmp, dest)
+        lastRenameErr = null
+        break
+      } catch (e) { lastRenameErr = e }
+    }
+    if (lastRenameErr) throw lastRenameErr
     return dest
-  } catch {
+  } catch (err) {
+    console.error('[downloadYtdl] failed:', err)
     broadcast('ui:toast', tr('main.ytdlFailed'))
     return null
   }
