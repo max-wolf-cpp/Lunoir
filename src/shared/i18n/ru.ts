@@ -17,7 +17,8 @@ export const ru: Partial<Record<Key, string>> = {
   'url.userAgent': 'User-Agent (только если он нужен этому источнику)',
   'empty.urlPlay': 'Воспроизвести',
   'empty.openFile': 'Открыть файл',
-  'empty.hint': 'Двойной щелчок — папка · правый щелчок — URL',
+  'empty.hint': 'Двойной щелчок — папка · правый щелчок в любом месте — URL',
+  'empty.urlBack': 'Правый клик — назад',
 
   'osc.mute': 'Без звука',
   'osc.unmute': 'Включить звук',

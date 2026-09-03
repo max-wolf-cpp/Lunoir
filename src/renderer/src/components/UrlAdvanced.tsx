@@ -49,6 +49,9 @@ export default function UrlAdvanced({
           // the parent's box turns Enter into "play" and Escape into "close"; typing a
           // UA must not trigger either, nor leak into the player's shortcuts
           onKeyDown={e => e.stopPropagation()}
+          // same as the URL input above: keep the native edit menu, and never
+          // let this right-click reach a container's flip/close handler
+          onContextMenu={e => e.stopPropagation()}
         />
       )}
     </div>

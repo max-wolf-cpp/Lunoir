@@ -16,7 +16,8 @@ export const de: Partial<Record<Key, string>> = {
   'url.userAgent': 'User-Agent (nur wenn diese Quelle einen braucht)',
   'empty.urlPlay': 'Abspielen',
   'empty.openFile': 'Datei öffnen',
-  'empty.hint': 'Doppelklick für Ordner · Rechtsklick für URL',
+  'empty.hint': 'Doppelklick für Ordner · Rechtsklick überall für eine URL',
+  'empty.urlBack': 'Rechtsklick zum Zurückkehren',
 
   'osc.mute': 'Stumm',
   'osc.unmute': 'Ton ein',

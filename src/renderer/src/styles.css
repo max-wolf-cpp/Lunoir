@@ -350,7 +350,11 @@ body.fullscreen .titlebar {
   align-items: center;
   justify-content: center;
   color: var(--text-dim);
-  pointer-events: none;
+  /* Hit-testable so a right-click on ANY empty spot flips to the URL box (and
+     back). No media is loaded while this is up, so the surface it covers (the
+     video layer's click/dblclick) has nothing meaningful to lose; wheel volume
+     still works — it bubbles up to the app root's own onWheel. */
+  pointer-events: auto;
   /* faint scrim over the main-window acrylic: keeps text readable and softens
      the inactive brightening (thicker when inactive) */
   background: var(--empty-scrim);
@@ -411,7 +415,8 @@ body.fullscreen .titlebar {
   pointer-events: auto;
 }
 
-.cta-hint {
+.cta-hint,
+.url-hint {
   font-size: 12px; /* base; CJK bumps to 14px below (see .brand-tagline) */
   color: rgba(255, 255, 255, 0.58);
   /* No letter-spacing. At this size 0.02em was 0.24px — invisible as tracking,
@@ -420,10 +425,18 @@ body.fullscreen .titlebar {
      like they were bobbing. Hanzi are evenly spaced by design and want none. */
 }
 
+/* the URL-mode hint lives outside the flex column (.cta-wrap), so it centers
+   itself and needs its own gap from the Advanced strip above it */
+.url-hint {
+  margin-top: 14px;
+  text-align: center;
+}
+
 /* CJK home copy needs the bigger size to render evenly (see .brand-tagline);
    Latin/Cyrillic keep the crisp 12px base above. */
 :root[data-cjk] .brand-tagline,
-:root[data-cjk] .cta-hint {
+:root[data-cjk] .cta-hint,
+:root[data-cjk] .url-hint {
   font-size: 14px;
 }
 

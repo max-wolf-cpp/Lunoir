@@ -2,6 +2,42 @@
 
 > 每到相对重要的节点更新此文档。方案见 [PLAN.md](PLAN.md)。
 
+## 当前状态（2026-09-04 · v0.9.3 发布 · URL 框原生编辑菜单 + Home 右键随处切换）
+
+**阶段：URL 输入框右键终于能复制粘贴了（Electron 默认不画编辑菜单，可编辑字段右键本来什么都没有）；顺手把 Home 的右键入口从「按钮上那小块」放开到「任意空白」。加上社区 PR #2 的两处修复一起发布。i18n / subset-font / 构建全绿。**
+
+### ① URL 输入框的原生右键编辑菜单
+
+根子是 Electron 行为：不装 Menu 就没有 Chromium 的编辑菜单，input 右键什么都不弹，而 URL 框父级的右键逻辑只负责「关掉输入框」。修法两层：
+
+- **主进程**给每个**可编辑字段**补原生 cut / copy / paste / selectAll，`params.isEditable` 守卫——非编辑区不碰，渲染层自有的右键（播放器菜单、片段 fps 菜单）原样拥有点击。
+- **独立窗口必须各自注册**：侧面板（设置 / 播放列表）和收藏窗是独立 BrowserWindow、各有各的 webContents，主窗口的 handler 管不到它们。抽成 `attachNativeEditMenu()` 挂到主窗 / 面板 / 收藏三类窗口。
+- 渲染端：URL 输入框与 UA 输入框 `stopPropagation`，右键只落到编辑菜单、不冒泡触发父级动作。
+
+### ② Home 右键随处切换（打开文件 ⇄ URL 界面）
+
+Yao 反馈：输入框右键改成编辑菜单后，「从 URL 界面右键回去」只剩播放按钮一个入口，藏太深。于是：
+
+- 右键**任意空白处** = 两界面 toggle，入口从 open-btn / url-box 各自的局部 handler 收拢成空态层根上一个 handler。
+- **输入框行为不动**：URL / UA 框右键仍是编辑菜单，stopPropagation 挡住 toggle。
+- `.empty-state` 从 `pointer-events: none` 改 `auto`：无媒体时底下视频层只剩空操作（单击暂停 / 双击全屏），不亏；音量滚轮走 `.app` 根的 `onWheel`，冒泡不受影响；标题栏 z20 仍在最上。
+- URL 界面加返回提示（`empty.urlBack`，九语言）：右键返回打开文件界面。Home 提示改为「双击打开文件夹 · **任意处右键输入 URL**」。
+
+### ③ 顺手修了 i18n-check 的存量 bug
+
+CRLF 行尾下 `extractValues` 的 `(.*)$` 把 `\r` 当行终止符 → **单行值 key 的占位符全读成空**，占位符检测形同虚设（只有多行值靠 trim 侥幸存活）。归一化行尾后检测真正生效，九语言占位符全对齐。这轮要不是新增 key 跑了一次检查，这个 bug 还会一直瞎下去。
+
+### ④ 社区 PR #2（v0.9.2 发布后合入，随本版一起发布）
+
+- **fix: resume local and saved playlists**（max-wolf-cpp）——本地与已保存播放列表的续播恢复。
+- **fix: retry yt-dlp rename on EPERM** —— Windows Defender 短暂占用刚写完的 .part 文件导致 renameSync 撞 EPERM，重试至多 5 次、延迟递增（500ms/1s/2s/4s），并把真实错误打出来便于诊断。
+
+### 发布
+
+- `package.json` 0.9.2 → 0.9.3;两个 exe（setup / portable,未签名）+ tag `v0.9.3`;release notes 覆盖 PR #2。
+
+---
+
 ## 当前状态（2026-09-02 · v0.9.2 发布 · 放大查看 + 文件信息浮层 + 外挂音轨）
 
 **阶段：两个用户痛点功能落地，加上社区 PR 合并。类型 / 构建 / i18n 全绿，Yao 实测通过。**

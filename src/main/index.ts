@@ -2611,6 +2611,7 @@ function makeLibraryWindow(): BrowserWindow {
       parkOverlay(lw) // warm, but not covering the screen — see parkOverlay
     }
   })
+  attachNativeEditMenu(lw) // rename / add-URL inputs get a native copy-paste menu too
   lw.on('closed', () => {
     libraryWin = null
   })
@@ -3031,6 +3032,7 @@ function makePanelWindow(kind: 'playlist' | 'settings'): BrowserWindow {
       parkOverlay(pw)
     }
   })
+  attachNativeEditMenu(pw) // settings fields / playlist search need copy-paste too
   pw.on('closed', () => {
     if (kind === 'playlist') rightPanelWin = null
     else leftPanelWin = null
@@ -3152,6 +3154,27 @@ function hideMenu(): void {
   }
 }
 
+/** Chromium doesn't draw its own edit menu in an Electron app — without this a
+ *  right-click inside an editable field shows nothing (the renderer's preventDefault
+ *  had no default to prevent). Spell it out ONLY for editable fields — everywhere else
+ *  the renderer's custom menu (menu:open) owns the click. Attach to every window that
+ *  hosts text inputs: the main window (URL boxes), the side panels (settings fields,
+ *  playlist search) and the library window (rename + add-URL inputs).
+ */
+function attachNativeEditMenu(w: BrowserWindow): void {
+  w.webContents.on('context-menu', (_e, params) => {
+    if (!params.isEditable) return
+    const menu = Menu.buildFromTemplate([
+      { role: 'cut', enabled: params.selectionText.length > 0 },
+      { role: 'copy', enabled: params.selectionText.length > 0 },
+      { role: 'paste' },
+      { type: 'separator' },
+      { role: 'selectAll' }
+    ])
+    menu.popup({ window: w })
+  })
+}
+
 function createWindows(): void {
   const settings = getSettings()
   const saved = settings.rememberWindow ? settings.windowBounds : null
@@ -3183,6 +3206,12 @@ function createWindows(): void {
   loadRendererWithSetup(win, '', () => {
     if (win && !win.isDestroyed()) removeBorderLine(win)
   })
+
+  // Electron doesn't render Chromium's edit menu on its own — without this an
+  // <input> right-click shows nothing (the URL box's own handler preventDefaults
+  // the default, but there is no default). Spell it out only for editable fields;
+  // everywhere else the renderer's custom context menu (menu:open) owns the click.
+  attachNativeEditMenu(win)
 
   oscWin = new BrowserWindow({
     width: 620,

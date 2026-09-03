@@ -35,7 +35,10 @@ function parse(file) {
 // Map key -> concatenated string-literal value (handles the few multi-line entries
 // where the value sits on the next line). Good enough to find {placeholders}.
 function extractValues(src) {
-  const lines = src.split('\n')
+  // Normalise CRLF first: `.` and `$` in keyRe treat `\r` as a line terminator,
+  // so a single-line value on a CRLF file never matched and every placeholder
+  // silently read as absent (only multi-line values survived via the trim below).
+  const lines = src.replace(/\r\n/g, '\n').split('\n')
   const out = {}
   const keyRe = /^\s*(?:'|")([\w.]+)(?:'|")\s*:\s*(.*)$/
   for (let i = 0; i < lines.length; i++) {

@@ -16,7 +16,8 @@ export const fr: Partial<Record<Key, string>> = {
   'url.userAgent': 'User-Agent (seulement si cette source en exige un)',
   'empty.urlPlay': 'Lire',
   'empty.openFile': 'Ouvrir un fichier',
-  'empty.hint': 'Double-clic pour un dossier · clic droit pour une URL',
+  'empty.hint': 'Double-clic pour un dossier · clic droit où que ce soit pour une URL',
+  'empty.urlBack': 'Clic droit pour revenir en arrière',
 
   'osc.mute': 'Couper le son',
   'osc.unmute': 'Rétablir le son',

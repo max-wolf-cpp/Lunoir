@@ -18,7 +18,8 @@ export const ko: Partial<Record<Key, string>> = {
   'url.userAgent': 'User-Agent (이 소스에 필요한 경우에만)',
   'empty.urlPlay': '재생',
   'empty.openFile': '파일 열기',
-  'empty.hint': '더블클릭은 폴더 · 우클릭은 URL',
+  'empty.hint': '더블클릭은 폴더 · 아무 곳이나 우클릭하면 URL',
+  'empty.urlBack': '우클릭으로 돌아가기',
 
   'osc.mute': '음소거',
   'osc.unmute': '음소거 해제',

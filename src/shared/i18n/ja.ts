@@ -18,7 +18,8 @@ export const ja: Partial<Record<Key, string>> = {
   'url.userAgent': 'User-Agent(このソースに必要な場合のみ)',
   'empty.urlPlay': '再生',
   'empty.openFile': 'ファイルを開く',
-  'empty.hint': 'ダブルクリックでフォルダー · 右クリックで URL',
+  'empty.hint': 'ダブルクリックでフォルダー · どこでも右クリックで URL',
+  'empty.urlBack': '右クリックで戻る',
 
   'osc.mute': 'ミュート',
   'osc.unmute': 'ミュート解除',

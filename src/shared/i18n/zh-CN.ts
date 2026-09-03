@@ -15,7 +15,8 @@ export const zhCN: Partial<Record<Key, string>> = {
   'url.userAgent': 'User-Agent(仅当此源需要时填写)',
   'empty.urlPlay': '播放',
   'empty.openFile': '打开文件',
-  'empty.hint': '双击打开文件夹 · 右键打开 URL',
+  'empty.hint': '双击打开文件夹 · 任意处右键输入 URL',
+  'empty.urlBack': '右键返回打开文件界面',
 
   'osc.mute': '静音',
   'osc.unmute': '取消静音',

@@ -46,7 +46,16 @@ export default function EmptyState({ onOpen }: { onOpen: () => void }) {
   }
 
   return (
-    <div className="empty-state">
+    <div
+      className="empty-state"
+      // Right-click anywhere flips between the two home surfaces (open-file ⇄ URL
+      // box). Editable fields stop the event in their own handler first, so the
+      // native copy/paste menu still works and this never fires over text.
+      onContextMenu={e => {
+        e.preventDefault()
+        setUrlInput(v => !v)
+      }}
+    >
       <img className="brand-logo" src={logoUrl} alt="" draggable={false} />
       <div
         className="brand-name"
@@ -58,13 +67,7 @@ export default function EmptyState({ onOpen }: { onOpen: () => void }) {
 
       {urlInput ? (
         <div className="url-wrap">
-        <div
-          className="url-box"
-          onContextMenu={e => {
-            e.preventDefault()
-            setUrlInput(false)
-          }}
-        >
+        <div className="url-box">
           <input
             className="url-input"
             autoFocus
@@ -76,6 +79,7 @@ export default function EmptyState({ onOpen }: { onOpen: () => void }) {
               if (e.key === 'Enter') submitUrl()
               else if (e.key === 'Escape') setUrlInput(false)
             }}
+            onContextMenu={e => e.stopPropagation()} // keep native copy/cut/paste — must not reach the container's flip handler
           />
           <button className="url-go" onClick={submitUrl} title={t('empty.urlPlay')}>
             <svg width="16" height="16" viewBox="0 0 24 24">
@@ -84,18 +88,12 @@ export default function EmptyState({ onOpen }: { onOpen: () => void }) {
           </button>
         </div>
         <UrlAdvanced ua={ua} onChange={setUa} />
+        <div className="url-hint">{t('empty.urlBack')}</div>
         </div>
       ) : (
         <div className="cta-wrap">
-          {/* left-click opens a file; right-click jumps straight to the URL box */}
-          <button
-            className="open-btn"
-            onClick={handleOpenClick}
-            onContextMenu={e => {
-              e.preventDefault()
-              setUrlInput(true)
-            }}
-          >
+          {/* left-click opens a file; double-click opens a Blu-ray/DVD disc folder */}
+          <button className="open-btn" onClick={handleOpenClick}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 15V4M8 8l4-4 4 4M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" />
             </svg>

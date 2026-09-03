@@ -16,7 +16,8 @@ export const es: Partial<Record<Key, string>> = {
   'url.userAgent': 'User-Agent (solo si esta fuente lo necesita)',
   'empty.urlPlay': 'Reproducir',
   'empty.openFile': 'Abrir archivo',
-  'empty.hint': 'Doble clic para una carpeta · clic derecho para una URL',
+  'empty.hint': 'Doble clic para una carpeta · clic derecho en cualquier lugar para una URL',
+  'empty.urlBack': 'Clic derecho para volver atrás',
 
   'osc.mute': 'Silenciar',
   'osc.unmute': 'Activar sonido',

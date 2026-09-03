@@ -20,7 +20,8 @@ export const en = {
   'url.userAgent': 'User-Agent (only if this source needs one)',
   'empty.urlPlay': 'Play',
   'empty.openFile': 'Open File',
-  'empty.hint': 'Double-click for a folder · right-click for a URL',
+  'empty.hint': 'Double-click for a folder · Right-click anywhere for a URL',
+  'empty.urlBack': 'Right-click anywhere to go back to Open File',
 
   // ---- OSC ----
   // Mute/unmute and play/pause are separate keys, not one "Play/Pause" label:
