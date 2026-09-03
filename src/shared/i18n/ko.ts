@@ -98,7 +98,7 @@ export const ko: Partial<Record<Key, string>> = {
     '각 파일의 재생 위치를 기억하고 다시 열 때 그 지점으로 돌아갑니다.',
   'set.resumePlaylist.label': '재생목록 위치 기억',
   'set.resumePlaylist.desc':
-    '재생목록 링크를 다시 열면 마지막으로 본 동영상으로 돌아갑니다.',
+    '재생목록 파일이나 링크를 다시 열면 마지막으로 본 동영상으로 돌아갑니다.',
 
   'set.keepPitch.label': '속도 변경 시 음정 유지',
   'set.keepPitch.desc':

@@ -96,7 +96,7 @@ export const de: Partial<Record<Key, string>> = {
     'Position in jeder Datei merken und beim erneuten Öffnen dorthin zurückkehren.',
   'set.resumePlaylist.label': 'Wiedergabelisten fortsetzen',
   'set.resumePlaylist.desc':
-    'Beim erneuten Öffnen eines Wiedergabelisten-Links zum zuletzt gesehenen Video zurückkehren.',
+    'Beim erneuten Öffnen einer Wiedergabelistendatei oder eines Links zum zuletzt gesehenen Video zurückkehren.',
 
   'set.keepPitch.label': 'Tonhöhe beim Tempowechsel halten',
   'set.keepPitch.desc':

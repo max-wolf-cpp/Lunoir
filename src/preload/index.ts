@@ -17,7 +17,7 @@ export interface Settings {
   uiLanguage: LangSetting // interface language; 'system' follows the OS locale
   scanFolderIntoPlaylist: boolean
   resumePlayback: boolean
-  resumePlaylistItem: boolean // reopening a playlist link jumps back to the last video watched
+  resumePlaylistItem: boolean // reopening a playlist file/link jumps back to the last video watched
   keepPitch: boolean // preserve audio pitch when changing speed (mpv audio-pitch-correction)
   audioLang: string
   subLang: string

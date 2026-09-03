@@ -181,8 +181,8 @@ export function saveAudioSelection(path: string, selection: AudioSelection): voi
   }
 }
 
-// ---- per-playlist "last item" (which video in a URL playlist you got to) ----
-// Keyed by a stable playlist id (e.g. YouTube's list=…), value = that item's URL.
+// ---- per-playlist "last item" (which video in a playlist you got to) ----
+// Keyed by a stable playlist id (e.g. local path or YouTube's list=…), value = the item.
 // Combined with the per-file positions above, reopening a playlist resumes both
 // the right video and the right time.
 type PlaylistItems = Record<string, string>

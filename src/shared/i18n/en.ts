@@ -119,7 +119,7 @@ export const en = {
   'set.resume.label': 'Resume playback',
   'set.resume.desc': 'Remember the position in each file and return to it when the file is reopened.',
   'set.resumePlaylist.label': 'Resume playlists',
-  'set.resumePlaylist.desc': 'Reopening a playlist link returns to the last video watched in it.',
+  'set.resumePlaylist.desc': 'Reopening a playlist file or link returns to the last video watched in it.',
 
   'set.keepPitch.label': 'Keep pitch when changing speed',
   'set.keepPitch.desc':

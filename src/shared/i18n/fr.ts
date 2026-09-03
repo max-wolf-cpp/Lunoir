@@ -96,7 +96,7 @@ export const fr: Partial<Record<Key, string>> = {
     'Mémoriser la position dans chaque fichier et y revenir à sa réouverture.',
   'set.resumePlaylist.label': 'Reprendre les listes de lecture',
   'set.resumePlaylist.desc':
-    'Rouvrir un lien de liste de lecture revient à la dernière vidéo regardée.',
+    'Rouvrir un fichier ou un lien de liste de lecture revient à la dernière vidéo regardée.',
 
   'set.keepPitch.label': 'Conserver la hauteur au changement de vitesse',
   'set.keepPitch.desc':
