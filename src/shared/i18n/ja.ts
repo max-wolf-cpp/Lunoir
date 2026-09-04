@@ -173,6 +173,9 @@ export const ja: Partial<Record<Key, string>> = {
     'ポインターが止まってから、画面上のコントロールが表示され続ける時間。',
   'set.oscDelay.desc2': '既定は 5 秒です。',
 
+  'set.seekPreview.label': 'シークバーのサムネイル',
+  'set.seekPreview.desc': 'シークバーにマウスを置くと、その時点の映像を表示します。ローカルファイルのみ。',
+
   'set.rememberWindow.label': 'サイズと位置を記憶',
   'set.rememberVolume.label': '音量を記憶',
 

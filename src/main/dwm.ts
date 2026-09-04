@@ -22,6 +22,7 @@ try {
 }
 
 // DWM window attributes (dwmapi.h)
+const DWMWA_CLOAK = 13
 const DWMWA_WINDOW_CORNER_PREFERENCE = 33
 const DWMWA_BORDER_COLOR = 34
 
@@ -64,4 +65,20 @@ export function removeBorderLine(win: BrowserWindow): void {
 /** Override the corner rounding (round / small / square). */
 export function setCornerPreference(win: BrowserWindow, pref: number): void {
   setDword(win, DWMWA_WINDOW_CORNER_PREFERENCE, pref)
+}
+
+/**
+ * Cloak a raw HWND so DWM still composites it (D3D swap chain stays alive)
+ * but the user doesn't see it. SW_HIDE freezes mpv's presenter — that's the
+ * black preview rectangle.
+ */
+export function setHwndCloaked(hwnd: bigint, cloaked: boolean): void {
+  if (!DwmSetWindowAttribute) return
+  const buf = Buffer.alloc(4)
+  buf.writeUInt32LE(cloaked ? 1 : 0, 0)
+  try {
+    DwmSetWindowAttribute(hwnd, DWMWA_CLOAK, buf, 4)
+  } catch (e) {
+    console.error('[dwm] cloak failed:', e)
+  }
 }

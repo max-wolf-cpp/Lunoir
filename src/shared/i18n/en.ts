@@ -196,6 +196,10 @@ export const en = {
     'How long the on-screen controls remain visible after the pointer stops moving.',
   'set.oscDelay.desc2': 'Default is 5 seconds.',
 
+  'set.seekPreview.label': 'Seek bar thumbnails',
+  'set.seekPreview.desc':
+    'When hovering the seek bar, show a preview of that moment. Local files only.',
+
   'set.rememberWindow.label': 'Remember size & position',
   'set.rememberVolume.label': 'Remember volume',
 

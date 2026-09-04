@@ -33,6 +33,7 @@ export interface Settings {
   passthroughCodecs: string // which formats to passthrough (comma list: ac3,eac3,truehd,dts,dts-hd)
   oscHideDelay: number // seconds the OSC stays before auto-hiding
   oscStyle: OscStyle // floating pill over the picture, or a bar docked at the bottom edge
+  seekPreview: boolean // hover the seek bar for a frame thumbnail (local files)
   frostStrength: number // 0..100 → acrylic panel scrim alpha (lower = more see-through)
   subHdrPeak: number // peak nits for subtitles over HDR video (mpv sub-hdr-peak)
   hwdec: Hwdec
@@ -204,6 +205,10 @@ const api = {
   // userAgent: optional, from the URL box's Advanced strip — belongs to this source
   loadFile: (path: string, userAgent = ''): void =>
     ipcRenderer.send('mpv:loadfile', path, userAgent),
+  // seek-bar preview (hover only). x is clientX inside the OSC window.
+  thumbPreview: (t: number, x: number, docked: boolean): void =>
+    ipcRenderer.send('thumb:seek', t, x, docked),
+  thumbHide: (): void => ipcRenderer.send('thumb:hide'),
   // re-download yt-dlp now (it also refreshes itself every 14 days). Resolves to
   // whether it succeeded.
   refreshYtdl: (): Promise<boolean> => ipcRenderer.invoke('app:refresh-ytdl'),

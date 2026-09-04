@@ -5,6 +5,10 @@ import { EventEmitter } from 'node:events'
 export interface MpvStartOptions {
   /** Native window handle (HWND as number) to embed mpv's video output into. */
   wid?: number
+  /** Extra CLI args, appended last so they override the defaults. */
+  extraArgs?: string[]
+  /** Observe the player-property set. False for the silent preview instance. */
+  observe?: boolean
 }
 
 // Properties we continuously observe and forward to the UI.
@@ -61,14 +65,19 @@ export class MpvController extends EventEmitter {
   private reqId = 1
   private pending = new Map<number, { resolve: (v: any) => void; reject: (e: any) => void }>()
   private connected = false
+  private observeProps = true
 
-  constructor(private readonly mpvPath: string) {
+  constructor(
+    private readonly mpvPath: string,
+    pipeName = 'mpvpipe'
+  ) {
     super()
     // Fixed pipe name (not per-pid) so external tools like SVP can find and attach
     // to this mpv over IPC. We use SVP's own default ('mpvpipe') so its mpv target
     // works with zero config. mpv's named pipe accepts multiple clients, so our
     // control connection and SVP coexist. (Trade-off: one instance at a time.)
-    this.pipePath = '\\\\.\\pipe\\mpvpipe'
+    // A second instance (seek-bar preview) passes a different pipeName.
+    this.pipePath = `\\\\.\\pipe\\${pipeName}`
   }
 
   start(opts: MpvStartOptions = {}): void {
@@ -97,6 +106,8 @@ export class MpvController extends EventEmitter {
       '--input-vo-keyboard=yes',
       `--input-ipc-server=${this.pipePath}`
     ]
+    this.observeProps = opts.observe !== false
+    if (opts.extraArgs) args.push(...opts.extraArgs)
     if (opts.wid != null) args.push(`--wid=${opts.wid}`)
 
     this.proc = spawn(this.mpvPath, args, { stdio: ['ignore', 'pipe', 'pipe'] })
@@ -125,8 +136,10 @@ export class MpvController extends EventEmitter {
       this.socket = sock
       this.connected = true
       this.emit('connected')
-      for (const p of OBSERVED) {
-        this.rawCommand({ command: ['observe_property', 1, p] })
+      if (this.observeProps) {
+        for (const p of OBSERVED) {
+          this.rawCommand({ command: ['observe_property', 1, p] })
+        }
       }
     })
     sock.on('data', d => this.onData(d))

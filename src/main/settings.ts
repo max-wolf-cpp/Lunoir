@@ -24,6 +24,7 @@ const DEFAULTS: Settings = {
   // bar at the window's bottom edge and — windowed — reserves the strip from the video
   // so the controls never cover it, and never auto-hide.
   oscStyle: 'floating',
+  seekPreview: true, // hover the seek bar for a frame thumbnail (local files)
   frostStrength: 50, // 0..100, higher = more see-through; 50 ≈ the default alpha 0.40
   subHdrPeak: 120, // dimmer than mpv's ~SDR-white default so HDR subs aren't harsh
   hwdec: 'auto',

@@ -171,6 +171,10 @@ export const pt: Partial<Record<Key, string>> = {
     'Durante quanto tempo os controlos no ecrã permanecem visíveis após o ponteiro parar.',
   'set.oscDelay.desc2': 'Predefinição: 5 segundos.',
 
+  'set.seekPreview.label': 'Miniaturas da barra de progresso',
+  'set.seekPreview.desc':
+    'Ao pairar sobre a barra, mostrar uma pré-visualização desse momento. Apenas ficheiros locais.',
+
   'set.rememberWindow.label': 'Memorizar tamanho e posição',
   'set.rememberVolume.label': 'Memorizar o volume',
 

@@ -171,6 +171,10 @@ export const es: Partial<Record<Key, string>> = {
     'Cuánto permanecen visibles los controles en pantalla tras detenerse el puntero.',
   'set.oscDelay.desc2': 'Por defecto: 5 segundos.',
 
+  'set.seekPreview.label': 'Miniaturas de la barra de progreso',
+  'set.seekPreview.desc':
+    'Al pasar el cursor por la barra, mostrar una vista previa de ese instante. Solo archivos locales.',
+
   'set.rememberWindow.label': 'Recordar tamaño y posición',
   'set.rememberVolume.label': 'Recordar el volumen',
 

@@ -380,7 +380,7 @@ export function usePlayer() {
 
   const actions = useRef({
     togglePause: () => window.mmp.command(['cycle', 'pause']),
-    seekTo: (sec: number) => window.mmp.command(['seek', sec, 'absolute']),
+    seekTo: (sec: number) => window.mmp.command(['seek', sec, 'absolute+exact']),
     seekBy: (d: number) => window.mmp.command(['seek', d, 'relative']),
     frameStep: (forward: boolean) => {
       // hold the "paused" icon steady across the step (frame-step briefly unpauses),

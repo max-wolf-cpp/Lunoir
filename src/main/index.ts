@@ -6,6 +6,7 @@ import { spawn, ChildProcess } from 'node:child_process'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 import { MpvController } from './mpv'
+import { ThumbnailService } from './thumb'
 import { removeBorderLine, setCornerPreference, CORNER_DEFAULT, CORNER_DONOTROUND } from './dwm'
 import {
   getSettings,
@@ -73,6 +74,7 @@ app.commandLine.appendSwitch('disable-lcd-text')
 let win: BrowserWindow | null = null
 let oscWin: BrowserWindow | null = null
 let mpv: MpvController | null = null
+let thumbs: ThumbnailService | null = null
 let preFsBounds: Electron.Rectangle | null = null
 // Mini player (PiP): the SAME window shrunk into a corner, kept on top, title strip
 // hidden. No re-parenting — mpv renders into this window's HWND either way, so the
@@ -1030,6 +1032,7 @@ function goHome(): void {
   trims.clear()
   clipFps.clear()
   resumePath = '' // nothing playing → nothing to write a position for
+  thumbs?.syncFile(null)
   // main keeps its OWN hasMedia (revealUi gates the OSC on it) and until now nothing
   // ever cleared it — there was no way back to Home with a file loaded. Leaving it set
   // makes every mouse move on the Home screen pop the OSC back up.
@@ -2197,6 +2200,7 @@ function setWinOpacity(w: BrowserWindow | null, v: number): void {
 // (setOpacity + setBounds). This avoids Windows' show() scale animation and the
 // "two layer" look of fading the content over a static frosted frame.
 function animateOsc(reveal: boolean): void {
+  if (!reveal) thumbs?.hide()
   if (!win || !oscWin || win.isDestroyed() || oscWin.isDestroyed()) return
   if (oscAnim) {
     clearInterval(oscAnim)
@@ -3305,6 +3309,8 @@ function createWindows(): void {
     for (const w of [oscWin, rightPanelWin, leftPanelWin, libraryWin]) {
       if (w && !w.isDestroyed()) w.close()
     }
+    thumbs?.destroy()
+    thumbs = null
     mpv?.quit()
     win = null
   })
@@ -3482,6 +3488,23 @@ function mmss(sec: number): string {
   return h > 0 ? `${h}:${p(m)}:${p(s)}` : `${m}:${p(s)}`
 }
 
+/** Local file, not live / URL / IPTV / EDL / trim. Yao: no previews on IPTV or any live source. */
+function syncThumb(path: string | null): void {
+  if (!getSettings().seekPreview) {
+    thumbs?.syncFile(null)
+    return
+  }
+  const ok =
+    !!path &&
+    !isUrl(path) &&
+    !isDiscUri(path) &&
+    !/\.edl$/i.test(path) &&
+    sourceType !== 'iptv' &&
+    !mergeOn &&
+    trimClip < 0
+  thumbs?.syncFile(ok ? path : null)
+}
+
 function startMpv(): void {
   const mpvPath = resolveMpvPath()
   if (!mpvPath) {
@@ -3516,6 +3539,9 @@ function startMpv(): void {
       lastDuration = 0
       stopRecording(true) // a new file means the old recording is done — end it quietly
       runProbe(data)
+    }
+    if (name === 'path') {
+      syncThumb(typeof data === 'string' && data ? data : null)
     }
     // "watch as one": derive the clip boundaries from the timeline's chapter list. mpv
     // titles a segment boundary with the exact path we wrote into the EDL, while the
@@ -3697,6 +3723,8 @@ function startMpv(): void {
     }
   })
   mpv.start({ wid: wid as unknown as number })
+  thumbs = new ThumbnailService()
+  thumbs.create(mpvPath)
 }
 
 function registerIpc(): void {
@@ -3732,6 +3760,12 @@ function registerIpc(): void {
   ipcMain.on('mpv:loadfile', (_e, path: string, userAgent?: string) =>
     openMedia(path, typeof userAgent === 'string' ? userAgent : '')
   )
+  ipcMain.on('thumb:seek', (_e, t: number, x: number, docked: boolean) => {
+    if (typeof t !== 'number' || !isFinite(t) || typeof x !== 'number') return
+    if (!oscWin || oscWin.isDestroyed()) return
+    thumbs?.seek(t, x, oscWin.getBounds(), win?.isFullScreen() ?? false, Boolean(docked))
+  })
+  ipcMain.on('thumb:hide', () => thumbs?.hide())
   ipcMain.on('ui:activity', () => {
     if (Date.now() < suppressRevealUntil) return // just toggled fullscreen — stay quiet
     revealUi()
@@ -4085,6 +4119,9 @@ function registerIpc(): void {
       // re-arm: coming from docked the hide timer was never allowed to fire, and going
       // to docked the bar may still be hidden from an earlier auto-hide
       if (hasMedia) revealUi()
+    }
+    if (key === 'seekPreview') {
+      syncThumb(value ? loadedTarget || playlist[plIndex] || null : null)
     }
     if (key === 'experimentalTimeline') {
       if (!value && mergeOn) toggleMerge() // turned off while merged → leave merge mode

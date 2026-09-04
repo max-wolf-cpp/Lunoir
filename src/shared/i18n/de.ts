@@ -171,6 +171,10 @@ export const de: Partial<Record<Key, string>> = {
     'Wie lange die Bildschirmsteuerung sichtbar bleibt, nachdem der Zeiger stoppt.',
   'set.oscDelay.desc2': 'Standard: 5 Sekunden.',
 
+  'set.seekPreview.label': 'Vorschaubilder in der Zeitleiste',
+  'set.seekPreview.desc':
+    'Beim Überfahren der Zeitleiste eine Vorschau dieses Zeitpunkts zeigen. Nur lokale Dateien.',
+
   'set.rememberWindow.label': 'Größe & Position merken',
   'set.rememberVolume.label': 'Lautstärke merken',
 

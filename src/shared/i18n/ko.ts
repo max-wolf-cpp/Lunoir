@@ -173,6 +173,9 @@ export const ko: Partial<Record<Key, string>> = {
     '포인터가 멈춘 후 화면 컨트롤이 계속 표시되는 시간.',
   'set.oscDelay.desc2': '기본값: 5초.',
 
+  'set.seekPreview.label': '시크바 미리보기',
+  'set.seekPreview.desc': '시크바에 마우스를 올리면 해당 시점의 화면을 보여 줍니다. 로컬 파일만.',
+
   'set.rememberWindow.label': '크기와 위치 기억',
   'set.rememberVolume.label': '음량 기억',
 

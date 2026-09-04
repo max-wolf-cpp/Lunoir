@@ -37,6 +37,7 @@ interface Settings {
   passthroughCodecs: string
   oscHideDelay: number
   oscStyle: 'floating' | 'docked'
+  seekPreview: boolean
   frostStrength: number
   subHdrPeak: number
   hwdec: 'auto' | 'auto-copy' | 'no'
@@ -865,6 +866,9 @@ export default function SettingsPanel({ open, onClose }: { open: boolean; onClos
               />
               <NumInput value={s.oscHideDelay} min={1} max={120} onChange={v => set('oscHideDelay', v)} />
             </div>
+          </Row>
+          <Row label={t('set.seekPreview.label')} desc={t('set.seekPreview.desc')}>
+            <Toggle on={s.seekPreview} onChange={v => set('seekPreview', v)} />
           </Row>
 
           <div className="set-sec">{t('set.sec.window')}</div>

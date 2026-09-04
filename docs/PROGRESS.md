@@ -2,6 +2,28 @@
 
 > 每到相对重要的节点更新此文档。方案见 [PLAN.md](PLAN.md)。
 
+## 当前状态（2026-09-04 · v0.9.4 发布 · 进度条缩略图）
+
+**阶段：本地文件 hover 进度条，浮出该时间点的静止预览——功能对齐 MPC-HC，Yao 真机验收通过。i18n / subset-font / 构建全绿。**
+
+### ① 进度条缩略图
+
+Yao 的需求：像 MPC 那样，悬停进度条看到那一帧，固定观感、不要花。拖动时不显示；IPTV / live / URL 不开。
+
+**架构走了第二路。** 一开始按文档抄 MPC 的「第二个 mpv `--wid` 嵌进 Electron 小窗」，Chromium 合成器吃不下外部 D3D 帧——只能在窗口大事件瞬间亮一下，随即变黑。截图换 `<img>` 能出画，但跟手会跳。最终：第二个无声 mpv **自己开原生无边框窗**（`--focus-on=never`，Win32 `WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE`），DWM cloak 隐藏（`SW_HIDE` 会冻交换链）。主播放器完全不碰。
+
+**画面：** 宽锁 320，高跟片源比例（2.35 变扁、4:3 变高、16:9 仍 180），底下一条灰底时间。悬浮贴 OSC 药丸上方 8px，停靠贴整条栏顶 12px，两套分开。点击与 hover 用同一套坐标，两边都 `absolute+exact`，点下去就是刚看到的那一帧。
+
+**开关：** 设置 → Interface → Controls，「进度条缩略图」，默认开。关掉立刻收窗、停副 mpv。
+
+**踩过的坑（别再走）：** `--wid` 进 Electron 窗；`screenshot-to-file` 换图；`SW_HIDE` 藏窗；DWM cloak 属性写成 17（那是 backdrop brush，正确是 13）；IPC 没连上就 `loadfile` 被丢掉→永远黑；OSD `--osd-shadow=0` 不是合法参数、副 mpv 直接退出还把主进程打崩。
+
+### 发布
+
+- `package.json` 0.9.3 → 0.9.4；两个 exe（setup / portable，未签名）+ tag `v0.9.4`。
+
+---
+
 ## 当前状态（2026-09-04 · v0.9.3 发布 · URL 框原生编辑菜单 + Home 右键随处切换）
 
 **阶段：URL 输入框右键终于能复制粘贴了（Electron 默认不画编辑菜单，可编辑字段右键本来什么都没有）；顺手把 Home 的右键入口从「按钮上那小块」放开到「任意空白」。加上社区 PR #2 的两处修复一起发布。i18n / subset-font / 构建全绿。**

@@ -153,6 +153,28 @@ export default function Controls(props: Props) {
   // one sends the point to main, which seeks the preview live and echoes it back.
   const trimming = state.trimClip >= 0
   const seekRef = useRef<HTMLDivElement>(null)
+  const pointerScrub = useRef(false)
+  const timeAt = (clientX: number): number => {
+    const wrap = seekRef.current
+    if (!wrap || dur <= 0) return 0
+    const r = wrap.getBoundingClientRect()
+    if (r.width <= 0) return 0
+    return Math.max(0, Math.min(1, (clientX - r.left) / r.width)) * dur
+  }
+  const hoverPreview = (e: ReactPointerEvent): void => {
+    if (trimming) return
+    if (e.buttons !== 0) {
+      window.mmp.thumbHide()
+      if (trimAnchor != null) setTrimAnchor(null)
+      props.onSeek(timeAt(e.clientX))
+      return
+    }
+    const wrap = seekRef.current
+    if (!wrap || dur <= 0) return
+    const r = wrap.getBoundingClientRect()
+    if (r.width <= 0) return
+    window.mmp.thumbPreview(timeAt(e.clientX), e.clientX, !!props.docked)
+  }
   // While a handle is dragged we scrub the video to preview that frame, but the white
   // playhead stays anchored where it was; on release the video returns there. So the
   // handle is a "preview" and playback always resumes from the playhead.
@@ -381,7 +403,12 @@ export default function Controls(props: Props) {
             ? String(frameOf(state))
             : fmt(headPos)}
       </span>
-      <div className="seek-wrap" ref={seekRef}>
+      <div
+        className="seek-wrap"
+        ref={seekRef}
+        onPointerMove={hoverPreview}
+        onPointerLeave={() => window.mmp.thumbHide()}
+      >
         <input
           className="rng seek"
           type="range"
@@ -391,8 +418,20 @@ export default function Controls(props: Props) {
           value={headPos}
           style={{ ['--fill' as any]: `${abPct(headPos)}%` }}
           onChange={e => {
-            if (trimAnchor != null) setTrimAnchor(null) // manual scrub takes over from the trim anchor
+            if (pointerScrub.current) return
+            if (trimAnchor != null) setTrimAnchor(null)
             props.onSeek(Number(e.target.value))
+          }}
+          onPointerDown={e => {
+            pointerScrub.current = true
+            if (trimAnchor != null) setTrimAnchor(null)
+            props.onSeek(timeAt(e.clientX))
+          }}
+          onPointerUp={() => {
+            pointerScrub.current = false
+          }}
+          onPointerCancel={() => {
+            pointerScrub.current = false
           }}
         />
         {/* clip boundaries when merged ("watch as one"); skip the first (t=0).

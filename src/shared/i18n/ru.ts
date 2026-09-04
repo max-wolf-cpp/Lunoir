@@ -172,6 +172,9 @@ export const ru: Partial<Record<Key, string>> = {
     'Как долго экранные элементы управления остаются видимыми после остановки указателя.',
   'set.oscDelay.desc2': 'По умолчанию: 5 секунд.',
 
+  'set.seekPreview.label': 'Миниатюры на шкале',
+  'set.seekPreview.desc': 'При наведении на шкалу показывать кадр этого момента. Только локальные файлы.',
+
   'set.rememberWindow.label': 'Запоминать размер и положение',
   'set.rememberVolume.label': 'Запоминать громкость',
 

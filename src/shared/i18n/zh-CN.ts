@@ -159,6 +159,9 @@ export const zhCN: Partial<Record<Key, string>> = {
   'set.oscDelay.desc1': '鼠标停止移动后，控制器保持显示的时间。',
   'set.oscDelay.desc2': '默认为 5 秒。',
 
+  'set.seekPreview.label': '进度条缩略图',
+  'set.seekPreview.desc': '鼠标悬停在进度条上时，显示该时间点的画面。仅本地文件。',
+
   'set.rememberWindow.label': '记住窗口大小与位置',
   'set.rememberVolume.label': '记住音量',
 

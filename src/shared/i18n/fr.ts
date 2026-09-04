@@ -171,6 +171,10 @@ export const fr: Partial<Record<Key, string>> = {
     'Durée d’affichage des commandes à l’écran après l’arrêt du pointeur.',
   'set.oscDelay.desc2': 'Par défaut : 5 secondes.',
 
+  'set.seekPreview.label': 'Aperçus de la barre de lecture',
+  'set.seekPreview.desc':
+    'Au survol de la barre, afficher un aperçu de cet instant. Fichiers locaux uniquement.',
+
   'set.rememberWindow.label': 'Mémoriser taille et position',
   'set.rememberVolume.label': 'Mémoriser le volume',
 
